@@ -18,9 +18,10 @@ function create_project(k)
         targetname 'vxt'
     end
 
-    if not nogfx then 
-        links { 'sdl2' }
+    if nogfx then
         defines { 'NO_GRAPHICS' }
+    else
+        links { 'sdl2' }
     end
 end
 

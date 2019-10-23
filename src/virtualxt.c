@@ -21,5 +21,6 @@ int main(int argc, char *argv[]) {
 		if (!SetConsoleMode(hOut, dwMode|ENABLE_VIRTUAL_TERMINAL_PROCESSING)) return GetLastError();
 	#endif
 
-	return main_vxt(argc, argv);
+
+	return main_vxt(vxt_init(0), argc, argv);
 }

@@ -1,2 +1,3 @@
-# virtual-xt
-Portable IBM PC/XT emulator written in C. 
+# VirtualXT
+
+A portable IBM PC/XT emulator written in C.

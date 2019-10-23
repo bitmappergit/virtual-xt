@@ -50,3 +50,8 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+Makefile
+.vs
+*.make
+*.vcxproj*
+*.sln

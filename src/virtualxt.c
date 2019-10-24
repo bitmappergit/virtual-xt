@@ -17,14 +17,29 @@
 	#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
 		#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
 	#endif
+
+	static int ___kbhit(void *ud) { return kbhit(); }
+	static int ___getch(void *ud) { return getch(); }
+#else
+	unsigned char unix_key = 0;
+	static int ___kbhit(void *ud) { return read(0, &unix_key, 1); }
+	static int ___getch(void *ud) { return (int)unix_key; }
 #endif
+
+static void ___putchar(void *ud, int ch) { putchar(ch); }
+
+vxt_terminal_t term = {
+	.userdata = 0,
+	.kbhit = ___kbhit,
+	.getch = ___getch,
+	.putchar = ___putchar
+};
 
 #ifndef NO_SDL
 
-#include <ctype.h>
 #include <SDL2/SDL.h>
 
-// This is an issue with the MinGW.
+// This is an issue with the MinGW. /aj
 #ifdef _WIN32
 	#ifdef main
 		#undef main
@@ -34,15 +49,26 @@
 SDL_Window *sdl_window = 0;
 SDL_Surface *sdl_surface = 0;
 SDL_AudioSpec sdl_audio = {44100, AUDIO_U8, 1, 0, 128};
+int sdl_has_key = 0, sdl_key = 0;
+
+static int sdl_kbhit(void *ud) {
+	if (sdl_has_key) return sdl_has_key;
+	if (sdl_has_key = kbhit()) sdl_key = getch();
+	return sdl_has_key;
+}
+
+static int sdl_getch(void *ud) {
+	sdl_has_key = 0;
+	return sdl_key;
+}
 
 static void *open_window(void *ud, vxt_mode_t m, int x, int y)
 {
 	SDL_Init(SDL_INIT_VIDEO);
-	sdl_window = SDL_CreateWindow(m == VXT_CGA ? "VirtualXT (CGA)" : "VirtualXT (Hercules)", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, x, y, 0);
+	sdl_window = SDL_CreateWindow(m == VXT_CGA ? "VirtualXT (CGA)" : "VirtualXT (Hercules)", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, x, y, SDL_WINDOW_INPUT_FOCUS|SDL_WINDOW_MOUSE_FOCUS);
 	sdl_surface = SDL_CreateRGBSurface(0, x, y, 8, 0xE0, 0x1C, 0x3, 0x0);
 
-	//SDL_EnableUNICODE(1);
-	//SDL_EnableKeyRepeat(500, 30);
+	term.kbhit = sdl_kbhit, term.getch = sdl_getch;
 }
 
 static void close_window(void *ud, void *w)
@@ -50,6 +76,9 @@ static void close_window(void *ud, void *w)
 	SDL_FreeSurface(sdl_surface), sdl_surface = 0;
 	SDL_DestroyWindow(sdl_window), sdl_window = 0;
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
+
+	term.kbhit = ___kbhit, term.getch = ___getch;
+	sdl_has_key = 0, sdl_key = 0;
 }
 
 static unsigned char *video_buffer(void *ud, void *w) {
@@ -64,10 +93,6 @@ static size_t ___read(void *ud, void* buf, size_t count) { return (size_t)read((
 static size_t ___write(void *ud, const void *buf, size_t count) { return (size_t)write((int)(intptr_t)ud, buf, count); }
 static size_t ___seek(void *ud, size_t offset, int whence) { return (size_t)lseek((int)(intptr_t)ud, offset, whence); }
 
-static int ___kbhit(void *ud) { return kbhit(); }
-static int ___getch(void *ud) { return getch(); }
-static void ___putchar(void *ud, int ch) { putchar(ch); }
-
 static struct tm *___localtime(void *ud) { time((time_t*)ud); return localtime((time_t*)ud); }
 static unsigned short ___millitm(void *ud) { struct timeb c; ftime(&c); return c.millitm; }
 
@@ -80,13 +105,6 @@ int main(int argc, char *argv[])
 		if (!GetConsoleMode(hOut, &dwMode)) return GetLastError();
 		if (!SetConsoleMode(hOut, dwMode|ENABLE_VIRTUAL_TERMINAL_PROCESSING)) return GetLastError();
 	#endif
-
-	vxt_terminal_t term = {
-		.userdata = 0,
-		.kbhit = ___kbhit,
-		.getch = ___getch,
-		.putchar = ___putchar
-	};
 
 	vxt_drive_t fd = {
 		.userdata = (void*)(intptr_t)open(argv[1], 32898),
@@ -129,6 +147,14 @@ int main(int argc, char *argv[])
 	while (vxt_step(e))
 	{
 		#ifndef NO_SDL
+			if (sdl_window)
+			{
+				SDL_Event ev;
+				while (SDL_PollEvent(&ev))
+					if (ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP)
+						sdl_key = ev.key.keysym.sym, sdl_has_key = 1;
+			}
+
 			SDL_PumpEvents();
 		#endif
 	}
@@ -138,23 +164,3 @@ int main(int argc, char *argv[])
 		SDL_Quit();
 	#endif
 }
-
-
-
-/*
-// Keyboard driver for console. This may need changing for UNIX/non-UNIX platforms
-#ifdef _WIN32
-#define KEYBOARD_DRIVER  e->term->kbhit(e->term->userdata) && (e->mem[0x4A6] = e->term->getch(e->term->userdata), pc_interrupt(e, 7))
-#else
-#define KEYBOARD_DRIVER read(0, mem + 0x4A6, 1) && (e->int8_asap = (mem[0x4A6] == 0x1B), pc_interrupt(e, 7))
-#endif
-
-// Keyboard driver for SDL
-#ifdef NO_GRAPHICS
-#define SDL_KEYBOARD_DRIVER KEYBOARD_DRIVER
-#else
-//#define SDL_KEYBOARD_DRIVER sdl_screen ? SDL_PollEvent(&sdl_event) && (sdl_event.type == SDL_KEYDOWN || sdl_event.type == SDL_KEYUP) && (scratch_uint = sdl_event.key.keysym.unicode, scratch2_uint = sdl_event.key.keysym.mod, CAST(short)mem[0x4A6] = 0x400 + 0x800*!!(scratch2_uint & KMOD_ALT) + 0x1000*!!(scratch2_uint & KMOD_SHIFT) + 0x2000*!!(scratch2_uint & KMOD_CTRL) + 0x4000*(sdl_event.type == SDL_KEYUP) + ((!scratch_uint || scratch_uint > 0x7F) ? sdl_event.key.keysym.sym : scratch_uint), pc_interrupt(7)) : (KEYBOARD_DRIVER)
-
-// This needs to be fixed. /aj
-#define SDL_KEYBOARD_DRIVER sdl_screen ? SDL_PollEvent(&sdl_event) && (sdl_event.type == SDL_KEYDOWN || sdl_event.type == SDL_KEYUP) && (e->mem[0x4A6] = (unsigned char)tolower(*SDL_GetKeyName(sdl_event.key.keysym.sym)), pc_interrupt(e, 7)) : (KEYBOARD_DRIVER) 
-*/

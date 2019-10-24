@@ -1,5 +1,6 @@
 for _,arg in ipairs(_ARGS) do
     if arg == 'nosdl' then nosdl = true
+    elseif arg == 'wall' then wall = true
     else error('Unknown argument: ' .. arg) end
 end
 
@@ -9,7 +10,8 @@ function create_project(k)
     targetdir ''
     platforms { 'native', 'x32', 'x64' }
     includedirs { 'src' }
-    --flags { 'ExtraWarnings', 'FatalWarnings' }
+
+    if wall then flags { 'ExtraWarnings'} --[[, 'FatalWarnings' }]] end
 
     if k == 'ConsoleApp' then
         files { 'src/virtualxt.c' }
@@ -33,9 +35,6 @@ solution 'VirtualXT'
 
     configuration 'Debug'
         flags { 'Symbols' }
-
-    --configuration 'vs*'
-    --    defines { '_CRT_SECURE_NO_WARNINGS' }
 
     configuration 'gmake'
         buildoptions { '-fsigned-char -std=c99' }

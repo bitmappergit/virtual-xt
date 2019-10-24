@@ -765,7 +765,7 @@ int vxt_step(vxt_emulator_t *e)
 		{
 			pc_interrupt(e, 0xA), e->int8_asap = 0;
 			if (e->term->kbhit(e->term->userdata))
-				e->mem[0x4A6] = e->term->getch(e->term->userdata), pc_interrupt(e, 7);
+				CAST(short)e->mem[0x4A6] = e->term->getch(e->term->userdata), pc_interrupt(e, 7);
 		}
 
 		return 1;

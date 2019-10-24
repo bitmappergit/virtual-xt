@@ -10,8 +10,6 @@
 #include <stddef.h>
 #include <time.h>
 
-//{44100, AUDIO_U8, 1, 0, 128};
-
 #define VXT_DEFAULT_ALLOCATOR 0
 #ifndef VXT_GRAPHICS_UPDATE_DELAY
     #define VXT_GRAPHICS_UPDATE_DELAY 360000
@@ -65,7 +63,9 @@ extern void vxt_set_video(vxt_emulator_t *e, vxt_video_t *video);
 extern void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac);
 extern void vxt_set_audio_silence(vxt_emulator_t *e, unsigned char s);
 extern int vxt_step(vxt_emulator_t *e);
-extern void vxt_audio_callback(vxt_emulator_t *e, unsigned char *stream, int len);
 extern void vxt_close(vxt_emulator_t *e);
+
+// Expects single channel, 44100Hz, unsigned bytes
+extern void vxt_audio_callback(vxt_emulator_t *e, unsigned char *stream, int len);
 
 #endif

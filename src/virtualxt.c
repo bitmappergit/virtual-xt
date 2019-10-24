@@ -7,22 +7,68 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/timeb.h>
 
 #ifdef _WIN32
-	#include <conio.h>
 	#include <windows.h>
+	#include <conio.h>
 	#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
 		#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
 	#endif
 #endif
 
-size_t ___read(void *ud, void* buf, size_t count) { return (size_t)read((int)(intptr_t)ud, buf, count); }
-size_t ___write(void *ud, const void *buf, size_t count) { return (size_t)write((int)(intptr_t)ud, buf, count); }
-size_t ___seek(void *ud, size_t offset, int whence) { return (size_t)lseek((int)(intptr_t)ud, offset, whence); }
+#ifndef NO_GRAPHICS
 
-int ___kbhit(void *ud) { return kbhit(); }
-int ___getch(void *ud) { return getch(); }
-void ___putchar(void *ud, int ch) { putchar(ch); }
+#include <ctype.h>
+#include <SDL2/SDL.h>
+
+// This is an issue with the MinGW.
+#ifdef _WIN32
+	#ifdef main
+		#undef main
+	#endif
+#endif
+
+SDL_Window *sdl_window = 0;
+SDL_Surface *sdl_surface = 0;
+
+static void *open_window(void *ud, vxt_mode_t m, int x, int y)
+{
+	SDL_Init(SDL_INIT_VIDEO);
+	sdl_window = SDL_CreateWindow(m == VXT_CGA ? "VirtualXT (CGA)" : "VirtualXT (Hercules)", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, x, y, 0);
+	sdl_surface = SDL_CreateRGBSurface(0, x, y, 8, 0xE0, 0x1C, 0x3, 0x0);
+
+	//SDL_EnableUNICODE(1);
+	//SDL_EnableKeyRepeat(500, 30);
+}
+
+static void close_window(void *ud, void *w)
+{
+	SDL_FreeSurface(sdl_surface), sdl_surface = 0;
+	SDL_DestroyWindow(sdl_window), sdl_window = 0;
+	SDL_QuitSubSystem(SDL_INIT_VIDEO);
+}
+
+static unsigned char *video_buffer(void *ud, void *w) {
+	SDL_BlitSurface(sdl_surface, 0, SDL_GetWindowSurface(sdl_window), 0);
+	SDL_UpdateWindowSurface(sdl_window);
+	return sdl_surface->pixels;
+}
+
+#endif
+
+static size_t ___read(void *ud, void* buf, size_t count) { return (size_t)read((int)(intptr_t)ud, buf, count); }
+static size_t ___write(void *ud, const void *buf, size_t count) { return (size_t)write((int)(intptr_t)ud, buf, count); }
+static size_t ___seek(void *ud, size_t offset, int whence) { return (size_t)lseek((int)(intptr_t)ud, offset, whence); }
+
+static int ___kbhit(void *ud) { return kbhit(); }
+static int ___getch(void *ud) { return getch(); }
+static void ___putchar(void *ud, int ch) { putchar(ch); }
+
+static struct tm *___localtime(void *ud) { time((time_t*)ud); return localtime((time_t*)ud); }
+static unsigned short ___millitm(void *ud) { struct timeb c; ftime(&c); return c.millitm; }
 
 int main(int argc, char *argv[])
 {
@@ -49,13 +95,42 @@ int main(int argc, char *argv[])
 		.seek = ___seek
 	};
 
-	vxt_emulator_t *e = vxt_init(&term, &fd, 0, 0);
-	while (vxt_step(e));
+	time_t clock_buf;
+	vxt_clock_t clock = {
+		.userdata = &clock_buf,
+		.localtime = ___localtime,
+		.millitm = ___millitm
+	};
+
+	vxt_emulator_t *e = vxt_init(&term, &clock, &fd, VXT_DEFAULT_ALLOCATOR);
 
 	#ifndef NO_GRAPHICS
+		vxt_video_t video = {
+			.userdata = 0,
+			.open = open_window,
+			.close = close_window,
+			.buffer = video_buffer
+		};
+		vxt_set_video(e, &video);
+	#endif
+
+	while (vxt_step(e))
+	{
+		#ifndef NO_GRAPHICS
+			SDL_PumpEvents();
+		#endif
+	}
+
+	#ifndef NO_GRAPHICS
+		if (sdl_window || sdl_surface) close_window(0, 0);
+	#endif
+
+	#if !defined(NO_GRAPHICS) || !defined(NO_AUDIO)
 		SDL_Quit();
 	#endif
 }
+
+
 
 /*
 // Keyboard driver for console. This may need changing for UNIX/non-UNIX platforms

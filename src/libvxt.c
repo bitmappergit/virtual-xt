@@ -8,10 +8,10 @@
 #include "bios.bin.h"
 
 #include <time.h>
-#include <sys/timeb.h>
+#include <malloc.h>
+#include <memory.h>
 
-#ifndef NO_GRAPHICS
-#include <ctype.h>
+#ifndef NO_AUDIO
 #include <SDL2/SDL.h>
 #endif
 
@@ -21,10 +21,7 @@
 #define REGS_BASE 0xF0000
 #define VIDEO_RAM_SIZE 0x10000
 
-// Graphics/timer/keyboard update delays (explained later)
-#ifndef GRAPHICS_UPDATE_DELAY
-#define GRAPHICS_UPDATE_DELAY 360000
-#endif
+// Timer/keyboard update delays (explained later)
 #define KEYBOARD_TIMER_UPDATE_DELAY 20000
 
 // 16-bit register decodes
@@ -92,27 +89,26 @@ struct vxt_emulator {
 	byte mem[RAM_SIZE], io_ports[IO_PORT_COUNT], bios_table_lookup[20][256];
 	byte *opcode_stream, *regs8, *vid_mem_base;
 	byte i_rm, i_w, i_reg, i_mod, i_mod_size, i_d, i_reg4bit, raw_opcode_id, xlat_opcode_id, extra, rep_mode, seg_override_en, rep_override_en, trap_flag, int8_asap, scratch_uchar, io_hi_lo, spkr_en;
-	word *regs16, reg_ip, seg_override, file_index, wave_counter;
+	word vid_addr_lookup[VIDEO_RAM_SIZE], *regs16, reg_ip, seg_override, file_index, wave_counter;
 	unsigned int op_source, op_dest, rm_addr, op_to_addr, op_from_addr, i_data0, i_data1, i_data2, scratch_uint, scratch2_uint, inst_counter, set_flags_type, GRAPHICS_X, GRAPHICS_Y, pixel_colors[16], vmem_ctr;
 	int op_result, scratch_int;
-
-	vxt_terminal_t *term;
-	vxt_drive_t *disk[2];
 	
+	vxt_terminal_t *term;
+	vxt_video_t *video;
+	void *window;
+	
+	vxt_drive_t *disk[2];
+	vxt_clock_t *clock;
 	vxt_alloc_t alloc;
-	time_t clock_buf;
-	struct timeb ms_clock;
 
 	const void *bios;
 	size_t bios_sz;
 };
 
-#ifndef NO_GRAPHICS
+const word cga_colors[4] = {0 /* Black */, 0x1F1F /* Cyan */, 0xE3E3 /* Magenta */, 0xFFFF /* White */};
+
+#ifndef NO_AUDIO
 SDL_AudioSpec sdl_audio = {44100, AUDIO_U8, 1, 0, 128};
-SDL_Window *sdl_window;
-SDL_Surface *sdl_screen;
-SDL_Event sdl_event;
-unsigned short vid_addr_lookup[VIDEO_RAM_SIZE], cga_colors[4] = {0 /* Black */, 0x1F1F /* Cyan */, 0xE3E3 /* Magenta */, 0xFFFF /* White */};
 #endif
 
 // Helper macros
@@ -243,8 +239,8 @@ static int AAA_AAS(vxt_emulator_t *e, char which_operation)
 	return (e->regs16[REG_AX] += 262 * which_operation*set_AF(e, set_CF(e, ((e->regs8[REG_AL] & 0x0F) > 9) || e->regs8[FLAG_AF])), e->regs8[REG_AL] &= 0x0F);
 }
 
-#ifndef NO_GRAPHICS
-void audio_callback(void *data, unsigned char *stream, int len)
+#ifndef NO_AUDIO
+static void audio_callback(void *data, unsigned char *stream, int len)
 {
 	vxt_emulator_t *e = (vxt_emulator_t*)data;
 	for (int i = 0; i < len; i++)
@@ -261,16 +257,19 @@ static void *default_alloc(void *p, size_t sz)
 	if (p && !sz) free(p);
 }
 
-vxt_emulator_t *vxt_init(vxt_terminal_t *term, vxt_drive_t *fd, vxt_drive_t *hd, vxt_alloc_t alloc)
+vxt_emulator_t *vxt_init(vxt_terminal_t *term, vxt_clock_t *clock, vxt_drive_t *fd, vxt_alloc_t alloc)
 {
 	alloc = alloc ? alloc : default_alloc;
 	vxt_emulator_t *e = (vxt_emulator_t*)alloc(0, sizeof(vxt_emulator_t));
 	e->alloc = alloc;
+	e->clock = clock;
 	e->term = term;
-	e->disk[0] = hd;
+	e->video = 0;
+	e->window = 0;
+	e->disk[0] = 0;
 	e->disk[1] = fd;
 
-#ifndef NO_GRAPHICS
+#ifndef NO_AUDIO
 	// Initialise SDL
 	SDL_Init(SDL_INIT_AUDIO);
 	sdl_audio.callback = audio_callback;
@@ -289,8 +288,7 @@ vxt_emulator_t *vxt_init(vxt_terminal_t *term, vxt_drive_t *fd, vxt_drive_t *hd,
 	e->regs8[FLAG_TF] = 0;
 
 	// Set DL equal to the boot device: 0 for the FD, or 0x80 for the HD. Normally, boot from the FD.
-	// But, if the HD image file is prefixed with @, then boot from the HD
-	e->regs8[REG_DL] = e->disk[0] && e->disk[0]->boot ? 0x80 : 0;
+	e->regs8[REG_DL] = 0;
 
 	// Floppy disk image (disk[1]), and hard disk image (disk[0]) if specified.
 
@@ -317,10 +315,13 @@ void vxt_load_bios(vxt_emulator_t *e, const void *data, size_t sz)
 	memcpy(e->regs8 + (e->reg_ip = 0x100), e->bios, e->bios_sz < 0xFF00 ? e->bios_sz : 0xFF00);
 }
 
-void vxt_close(vxt_emulator_t *e)
-{
-	e->alloc(e, 0);
+void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd) {
+	e->regs8[REG_DL] = hd->boot ? 0x80 : 0;
+	e->disk[0] = hd;
 }
+
+void vxt_set_video(vxt_emulator_t *e, vxt_video_t *video) { e->video = video; }
+void vxt_close(vxt_emulator_t *e) { e->alloc(e, 0); }
 
 int vxt_step(vxt_emulator_t *e)
 {
@@ -616,7 +617,7 @@ int vxt_step(vxt_emulator_t *e)
 				R_M_OP(e->io_ports[e->scratch_uint], =, e->regs8[REG_AL]);
 				e->scratch_uint == 0x61 && (e->io_hi_lo = 0, e->spkr_en |= e->regs8[REG_AL] & 3); // Speaker control
 				(e->scratch_uint == 0x40 || e->scratch_uint == 0x42) && (e->io_ports[0x43] & 6) && (e->mem[0x469 + e->scratch_uint - (e->io_hi_lo ^= 1)] = e->regs8[REG_AL]); // PIT rate programming
-#ifndef NO_GRAPHICS
+#ifndef NO_AUDIO
 				e->scratch_uint == 0x43 && (e->io_hi_lo = 0, e->regs8[REG_AL] >> 6 == 2) && (SDL_PauseAudio((e->regs8[REG_AL] & 0xF7) != 0xB6), 0); // Speaker enable
 #endif
 				e->scratch_uint == 0x3D5 && (e->io_ports[0x3D4] >> 1 == 6) && (e->mem[0x4AD + !(e->io_ports[0x3D4] & 1)] = e->regs8[REG_AL]); // CRT video RAM start offset
@@ -699,10 +700,8 @@ int vxt_step(vxt_emulator_t *e)
 					OPCODE_CHAIN 0: // PUTCHAR_AL
 						e->term->putchar(e->term->userdata, *e->regs8)
 					OPCODE 1: // GET_RTC
-						time(&e->clock_buf);
-						ftime(&e->ms_clock);
-						memcpy(e->mem + SEGREG(REG_ES, REG_BX,), localtime(&e->clock_buf), sizeof(struct tm));
-						CAST(short)e->mem[SEGREG(REG_ES, REG_BX, 36+)] = e->ms_clock.millitm;
+						memcpy(e->mem + SEGREG(REG_ES, REG_BX,), e->clock->localtime(e->clock->userdata), sizeof(struct tm));
+						CAST(short)e->mem[SEGREG(REG_ES, REG_BX, 36+)] = e->clock->millitm(e->clock->userdata);
 					OPCODE 2: // DISK_READ
 					OPCODE_CHAIN 3: // DISK_WRITE
 						scratch_disk = e->disk[e->regs8[REG_DL]];
@@ -734,19 +733,18 @@ int vxt_step(vxt_emulator_t *e)
 		if (!(++e->inst_counter % KEYBOARD_TIMER_UPDATE_DELAY))
 			e->int8_asap = 1;
 
-#ifndef NO_GRAPHICS
-		// Update the video graphics display every GRAPHICS_UPDATE_DELAY instructions
-		if (!(e->inst_counter % GRAPHICS_UPDATE_DELAY))
+		// Update the video graphics display every VXT_GRAPHICS_UPDATE_DELAY instructions
+		if (e->video && !(e->inst_counter % VXT_GRAPHICS_UPDATE_DELAY))
 		{
 			// Video card in graphics mode?
 			if (e->io_ports[0x3B8] & 2)
 			{
-				byte cga_mode = e->mem[0x4AC];
-
-				// If we don't already have an SDL window open, set it up and compute color and video memory translation tables
-				if (!sdl_screen)
+				// If we don't already have an window open, set it up and compute color and video memory translation tables
+				if (!e->window)
 				{
-					if (cga_mode) // CGA?
+					vxt_mode_t video_mode = e->mem[0x4AC] ? VXT_CGA : VXT_HERCULES;
+					e->window = e->video->open(e->video->userdata, video_mode, e->GRAPHICS_X, e->GRAPHICS_Y);
+					if (video_mode == VXT_CGA)
 					{
 						for (int i = 0; i < 16; i++)
 							e->pixel_colors[i] = cga_colors[(i & 12) >> 2] + (cga_colors[i & 3] << 16); // CGA -> RGB332	
@@ -758,36 +756,20 @@ int vxt_step(vxt_emulator_t *e)
 					}
 
 					for (int i = 0; i < e->GRAPHICS_X * e->GRAPHICS_Y / 4; i++)
-						vid_addr_lookup[i] = i / e->GRAPHICS_X * (e->GRAPHICS_X / 8) + (i / 2) % (e->GRAPHICS_X / 8) + 0x2000*(e->mem[0x4AC] ? (2 * i / e->GRAPHICS_X) % 2 : (4 * i / e->GRAPHICS_X) % 4);
-
-					SDL_Init(SDL_INIT_VIDEO);
-					sdl_window = SDL_CreateWindow(cga_mode ? "VirtualXT (CGA)" : "VirtualXT (Hercules)", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, e->GRAPHICS_X, e->GRAPHICS_Y, 0);
-					sdl_screen = SDL_CreateRGBSurface(0, e->GRAPHICS_X, e->GRAPHICS_Y, 8, 0xE0, 0x1C, 0x3, 0x0);
-
-					//SDL_EnableUNICODE(1);
-					//SDL_EnableKeyRepeat(500, 30);
+						e->vid_addr_lookup[i] = i / e->GRAPHICS_X * (e->GRAPHICS_X / 8) + (i / 2) % (e->GRAPHICS_X / 8) + 0x2000*(e->mem[0x4AC] ? (2 * i / e->GRAPHICS_X) % 2 : (4 * i / e->GRAPHICS_X) % 4);
 				}
 
-				// Refresh SDL display from emulated graphics card video RAM
-				e->vid_mem_base = e->mem + 0xB0000 + 0x8000*(cga_mode ? 1 : e->io_ports[0x3B8] >> 7); // B800:0 for CGA/Hercules bank 2, B000:0 for Hercules bank 1
+				// Refresh video display from emulated graphics card video RAM
+				unsigned *pixels = (unsigned*)e->video->buffer(e->video->userdata, e->window);
+				e->vid_mem_base = e->mem + 0xB0000 + 0x8000*(e->mem[0x4AC] ? 1 : e->io_ports[0x3B8] >> 7); // B800:0 for CGA/Hercules bank 2, B000:0 for Hercules bank 1
 				for (int i = 0; i < e->GRAPHICS_X * e->GRAPHICS_Y / 4; i++)
-					((unsigned *)sdl_screen->pixels)[i] = e->pixel_colors[15 & (e->vid_mem_base[vid_addr_lookup[i]] >> 4*!(i & 1))];
-
-				SDL_BlitSurface(sdl_screen, NULL, SDL_GetWindowSurface(sdl_window), NULL);
-				SDL_UpdateWindowSurface(sdl_window);
+					pixels[i] = e->pixel_colors[15 & (e->vid_mem_base[e->vid_addr_lookup[i]] >> 4*!(i & 1))];
 			}
-			else if (sdl_screen) // Application has gone back to text mode, so close the SDL window
+			else if (e->window) // Application has gone back to text mode, so close the window
 			{
-				SDL_FreeSurface(sdl_screen);
-				SDL_DestroyWindow(sdl_window);
-				SDL_QuitSubSystem(SDL_INIT_VIDEO);
-				
-				sdl_screen = 0;
-				sdl_window = 0;
+				e->video->close(e->video->userdata, e->window), e->window = 0;
 			}
-			SDL_PumpEvents();
 		}
-#endif
 
 		// Application has set trap flag, so fire INT 1
 		if (e->trap_flag)

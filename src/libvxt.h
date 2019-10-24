@@ -8,9 +8,20 @@
 #define _LIBVXT_H_
 
 #include <stddef.h>
+#include <time.h>
+
+#define VXT_DEFAULT_ALLOCATOR 0
+#ifndef VXT_GRAPHICS_UPDATE_DELAY
+    #define VXT_GRAPHICS_UPDATE_DELAY 360000
+#endif
 
 typedef struct vxt_emulator vxt_emulator_t;
 typedef void* (*vxt_alloc_t)(void*,size_t);
+
+typedef enum {
+    VXT_CGA,
+    VXT_HERCULES
+} vxt_mode_t;
 
 typedef struct {
     void *userdata;
@@ -22,6 +33,21 @@ typedef struct {
 
 typedef struct {
     void *userdata;
+
+    struct tm *(*localtime)(void*);
+    unsigned short (*millitm)(void*);
+} vxt_clock_t;
+
+typedef struct {
+    void *userdata;
+
+    void *(*open)(void*,vxt_mode_t,int,int);
+    void (*close)(void*,void*);
+    unsigned char *(*buffer)(void*,void*); // Returns a RGB332 buffer with X*Y size
+} vxt_video_t;
+
+typedef struct {
+    void *userdata;
     int boot;
 
     size_t (*read)(void*,void*,size_t);
@@ -29,8 +55,10 @@ typedef struct {
     size_t (*seek)(void*,size_t,int);
 } vxt_drive_t;
 
-extern vxt_emulator_t *vxt_init(vxt_terminal_t *term, vxt_drive_t *fd, vxt_drive_t *hd, vxt_alloc_t alloc);
+extern vxt_emulator_t *vxt_init(vxt_terminal_t *term, vxt_clock_t *clock, vxt_drive_t *fd, vxt_alloc_t alloc);
 extern void vxt_load_bios(vxt_emulator_t *e, const void *data, size_t sz);
+extern void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd);
+extern void vxt_set_video(vxt_emulator_t *e, vxt_video_t *video);
 extern void vxt_close(vxt_emulator_t *e);
 extern int vxt_step(vxt_emulator_t *e);
 

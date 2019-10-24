@@ -1,6 +1,5 @@
 for _,arg in ipairs(_ARGS) do
-    if arg == 'nogfx' then nogfx = true
-    elseif arg == 'nosfx' then nosfx = true
+    if arg == 'nosdl' then nosdl = true
     else error('Unknown argument: ' .. arg) end
 end
 
@@ -15,16 +14,14 @@ function create_project(k)
     if k == 'ConsoleApp' then
         files { 'src/virtualxt.c' }
         links { 'libvxt' }
+        if nosdl then
+            defines { 'NO_SDL' }
+        else
+            links { 'SDL2' }
+        end
     else
         files { 'src/libvxt.c' }
         targetname 'vxt'
-    end
-
-    if nogfx then defines { 'NO_GRAPHICS' } end
-    if nosfx then defines { 'NO_AUDIO' } end
-
-    if not nogfx or not nosfx then
-        links { 'SDL2' }
     end
 end
 

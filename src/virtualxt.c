@@ -19,7 +19,7 @@
 	#endif
 #endif
 
-#ifndef NO_GRAPHICS
+#ifndef NO_SDL
 
 #include <ctype.h>
 #include <SDL2/SDL.h>
@@ -33,6 +33,7 @@
 
 SDL_Window *sdl_window = 0;
 SDL_Surface *sdl_surface = 0;
+SDL_AudioSpec sdl_audio = {44100, AUDIO_U8, 1, 0, 128};
 
 static void *open_window(void *ud, vxt_mode_t m, int x, int y)
 {
@@ -104,7 +105,18 @@ int main(int argc, char *argv[])
 
 	vxt_emulator_t *e = vxt_init(&term, &clock, &fd, VXT_DEFAULT_ALLOCATOR);
 
-	#ifndef NO_GRAPHICS
+	#ifndef NO_SDL
+		SDL_Init(SDL_INIT_AUDIO);
+		sdl_audio.callback = (SDL_AudioCallback)vxt_audio_callback;
+		sdl_audio.userdata = (void*)e;
+		#ifdef _WIN32
+			sdl_audio.samples = 512;
+		#endif
+		SDL_OpenAudio(&sdl_audio, 0);
+
+		vxt_set_audio_control(e, (vxt_pause_audio_t)SDL_PauseAudio);
+		vxt_set_audio_silence(e, sdl_audio.silence);
+
 		vxt_video_t video = {
 			.userdata = 0,
 			.open = open_window,
@@ -116,16 +128,13 @@ int main(int argc, char *argv[])
 
 	while (vxt_step(e))
 	{
-		#ifndef NO_GRAPHICS
+		#ifndef NO_SDL
 			SDL_PumpEvents();
 		#endif
 	}
 
-	#ifndef NO_GRAPHICS
+	#ifndef NO_SDL
 		if (sdl_window || sdl_surface) close_window(0, 0);
-	#endif
-
-	#if !defined(NO_GRAPHICS) || !defined(NO_AUDIO)
 		SDL_Quit();
 	#endif
 }

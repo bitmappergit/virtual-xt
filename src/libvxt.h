@@ -10,6 +10,8 @@
 #include <stddef.h>
 #include <time.h>
 
+//{44100, AUDIO_U8, 1, 0, 128};
+
 #define VXT_DEFAULT_ALLOCATOR 0
 #ifndef VXT_GRAPHICS_UPDATE_DELAY
     #define VXT_GRAPHICS_UPDATE_DELAY 360000
@@ -17,6 +19,7 @@
 
 typedef struct vxt_emulator vxt_emulator_t;
 typedef void* (*vxt_alloc_t)(void*,size_t);
+typedef void (*vxt_pause_audio_t)(int);
 
 typedef enum {
     VXT_CGA,
@@ -59,7 +62,10 @@ extern vxt_emulator_t *vxt_init(vxt_terminal_t *term, vxt_clock_t *clock, vxt_dr
 extern void vxt_load_bios(vxt_emulator_t *e, const void *data, size_t sz);
 extern void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd);
 extern void vxt_set_video(vxt_emulator_t *e, vxt_video_t *video);
-extern void vxt_close(vxt_emulator_t *e);
+extern void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac);
+extern void vxt_set_audio_silence(vxt_emulator_t *e, unsigned char s);
 extern int vxt_step(vxt_emulator_t *e);
+extern void vxt_audio_callback(vxt_emulator_t *e, unsigned char *stream, int len);
+extern void vxt_close(vxt_emulator_t *e);
 
 #endif

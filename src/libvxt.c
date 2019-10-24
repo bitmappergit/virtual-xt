@@ -11,10 +11,6 @@
 #include <malloc.h>
 #include <memory.h>
 
-#ifndef NO_AUDIO
-#include <SDL2/SDL.h>
-#endif
-
 // Emulator system constants
 #define IO_PORT_COUNT 0x10000
 #define RAM_SIZE 0x10FFF0
@@ -101,15 +97,14 @@ struct vxt_emulator {
 	vxt_clock_t *clock;
 	vxt_alloc_t alloc;
 
+	byte audio_silence;
+	vxt_pause_audio_t pause_audio;
+
 	const void *bios;
 	size_t bios_sz;
 };
 
 const word cga_colors[4] = {0 /* Black */, 0x1F1F /* Cyan */, 0xE3E3 /* Magenta */, 0xFFFF /* White */};
-
-#ifndef NO_AUDIO
-SDL_AudioSpec sdl_audio = {44100, AUDIO_U8, 1, 0, 128};
-#endif
 
 // Helper macros
 
@@ -239,17 +234,6 @@ static int AAA_AAS(vxt_emulator_t *e, char which_operation)
 	return (e->regs16[REG_AX] += 262 * which_operation*set_AF(e, set_CF(e, ((e->regs8[REG_AL] & 0x0F) > 9) || e->regs8[FLAG_AF])), e->regs8[REG_AL] &= 0x0F);
 }
 
-#ifndef NO_AUDIO
-static void audio_callback(void *data, unsigned char *stream, int len)
-{
-	vxt_emulator_t *e = (vxt_emulator_t*)data;
-	for (int i = 0; i < len; i++)
-		stream[i] = (e->spkr_en == 3) && CAST(unsigned short)e->mem[0x4AA] ? -((54 * e->wave_counter++ / CAST(unsigned short)e->mem[0x4AA]) & 1) : sdl_audio.silence;
-
-	e->spkr_en = e->io_ports[0x61] & 3;
-}
-#endif
-
 static void *default_alloc(void *p, size_t sz)
 {
 	if (!p) return malloc(sz);
@@ -264,21 +248,12 @@ vxt_emulator_t *vxt_init(vxt_terminal_t *term, vxt_clock_t *clock, vxt_drive_t *
 	e->alloc = alloc;
 	e->clock = clock;
 	e->term = term;
+	e->pause_audio = 0;
+	e->audio_silence = 0;
 	e->video = 0;
 	e->window = 0;
 	e->disk[0] = 0;
 	e->disk[1] = fd;
-
-#ifndef NO_AUDIO
-	// Initialise SDL
-	SDL_Init(SDL_INIT_AUDIO);
-	sdl_audio.callback = audio_callback;
-	sdl_audio.userdata = (void*)e;
-#ifdef _WIN32
-	sdl_audio.samples = 512;
-#endif
-	SDL_OpenAudio(&sdl_audio, 0);
-#endif
 
 	// regs16 and reg8 point to F000:0, the start of memory-mapped registers. CS is initialised to F000
 	e->regs16 = (unsigned short *)(e->regs8 = e->mem + REGS_BASE);
@@ -306,6 +281,13 @@ vxt_emulator_t *vxt_init(vxt_terminal_t *term, vxt_clock_t *clock, vxt_drive_t *
 	return e;
 }
 
+void vxt_audio_callback(vxt_emulator_t *e, unsigned char *stream, int len)
+{
+	for (int i = 0; i < len; i++)
+		stream[i] = (e->spkr_en == 3) && CAST(unsigned short)e->mem[0x4AA] ? -((54 * e->wave_counter++ / CAST(unsigned short)e->mem[0x4AA]) & 1) : e->audio_silence;
+	e->spkr_en = e->io_ports[0x61] & 3;
+}
+
 void vxt_load_bios(vxt_emulator_t *e, const void *data, size_t sz)
 {
 	e->bios = data;
@@ -320,6 +302,8 @@ void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd) {
 	e->disk[0] = hd;
 }
 
+void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac) { e->pause_audio = ac; }
+void vxt_set_audio_silence(vxt_emulator_t *e, unsigned char s) { e->audio_silence = s; }
 void vxt_set_video(vxt_emulator_t *e, vxt_video_t *video) { e->video = video; }
 void vxt_close(vxt_emulator_t *e) { e->alloc(e, 0); }
 
@@ -617,9 +601,7 @@ int vxt_step(vxt_emulator_t *e)
 				R_M_OP(e->io_ports[e->scratch_uint], =, e->regs8[REG_AL]);
 				e->scratch_uint == 0x61 && (e->io_hi_lo = 0, e->spkr_en |= e->regs8[REG_AL] & 3); // Speaker control
 				(e->scratch_uint == 0x40 || e->scratch_uint == 0x42) && (e->io_ports[0x43] & 6) && (e->mem[0x469 + e->scratch_uint - (e->io_hi_lo ^= 1)] = e->regs8[REG_AL]); // PIT rate programming
-#ifndef NO_AUDIO
-				e->scratch_uint == 0x43 && (e->io_hi_lo = 0, e->regs8[REG_AL] >> 6 == 2) && (SDL_PauseAudio((e->regs8[REG_AL] & 0xF7) != 0xB6), 0); // Speaker enable
-#endif
+				e->scratch_uint == 0x43 && e->pause_audio && (e->io_hi_lo = 0, e->regs8[REG_AL] >> 6 == 2) && (e->pause_audio((e->regs8[REG_AL] & 0xF7) != 0xB6), 0); // Speaker enable
 				e->scratch_uint == 0x3D5 && (e->io_ports[0x3D4] >> 1 == 6) && (e->mem[0x4AD + !(e->io_ports[0x3D4] & 1)] = e->regs8[REG_AL]); // CRT video RAM start offset
 				e->scratch_uint == 0x3D5 && (e->io_ports[0x3D4] >> 1 == 7) && (e->scratch2_uint = ((e->mem[0x49E]*80 + e->mem[0x49D] + CAST(short)e->mem[0x4AD]) & (e->io_ports[0x3D4] & 1 ? 0xFF00 : 0xFF)) + (e->regs8[REG_AL] << (e->io_ports[0x3D4] & 1 ? 0 : 8)) - CAST(short)e->mem[0x4AD], e->mem[0x49D] = e->scratch2_uint % 80, e->mem[0x49E] = e->scratch2_uint / 80); // CRT cursor position
 				e->scratch_uint == 0x3B5 && e->io_ports[0x3B4] == 1 && (e->GRAPHICS_X = e->regs8[REG_AL] * 16); // Hercules resolution reprogramming. Defaults are set in the BIOS

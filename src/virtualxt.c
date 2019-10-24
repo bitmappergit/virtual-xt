@@ -21,6 +21,8 @@
 	static int ___kbhit(void *ud) { return kbhit(); }
 	static int ___getch(void *ud) { return getch(); }
 #else
+	#include <fcntl.h>
+	
 	unsigned char unix_key = 0;
 	static int ___kbhit(void *ud) { return read(0, &unix_key, 1); }
 	static int ___getch(void *ud) { return (int)unix_key; }
@@ -53,7 +55,7 @@ int sdl_has_key = 0, sdl_key = 0;
 
 static int sdl_kbhit(void *ud) {
 	if (sdl_has_key) return sdl_has_key;
-	if (sdl_has_key = kbhit()) sdl_key = getch();
+	if (sdl_has_key = ___kbhit(0)) sdl_key = ___getch(0);
 	return sdl_has_key;
 }
 

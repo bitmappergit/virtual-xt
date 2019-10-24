@@ -10,11 +10,28 @@
 #include <stddef.h>
 
 typedef struct vxt_emulator vxt_emulator_t;
-typedef void* (*vxt_alloc)(void*,size_t);
+typedef void* (*vxt_alloc_t)(void*,size_t);
 
-extern vxt_emulator_t *vxt_init(vxt_alloc);
-extern void vxt_close(vxt_emulator_t*);
+typedef struct {
+    void *userdata;
 
-extern int main_vxt(vxt_emulator_t *e, int argc, char *argv[]);
+    int (*kbhit)(void*);
+    int (*getch)(void*);
+    void (*putchar)(void*,int);
+} vxt_terminal_t;
+
+typedef struct {
+    void *userdata;
+    int boot;
+
+    size_t (*read)(void*,void*,size_t);
+    size_t (*write)(void*,const void*,size_t); 
+    size_t (*seek)(void*,size_t,int);
+} vxt_drive_t;
+
+extern vxt_emulator_t *vxt_init(vxt_terminal_t *term, vxt_drive_t *fd, vxt_drive_t *hd, vxt_alloc_t alloc);
+extern void vxt_load_bios(vxt_emulator_t *e, const void *data, size_t sz);
+extern void vxt_close(vxt_emulator_t *e);
+extern int vxt_step(vxt_emulator_t *e);
 
 #endif

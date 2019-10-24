@@ -5,20 +5,13 @@
 // This work is licensed under the MIT License. See included LICENSE file.
 
 #include "libvxt.h"
+#include "bios.bin.h"
 
 #include <time.h>
 #include <sys/timeb.h>
-#include <memory.h>
-
-#ifndef _WIN32
-#include <unistd.h>
-#include <fcntl.h>
-#else
-#include<conio.h>
-#endif
 
 #ifndef NO_GRAPHICS
-#include <string.h>
+#include <ctype.h>
 #include <SDL2/SDL.h>
 #endif
 
@@ -101,11 +94,17 @@ struct vxt_emulator {
 	byte i_rm, i_w, i_reg, i_mod, i_mod_size, i_d, i_reg4bit, raw_opcode_id, xlat_opcode_id, extra, rep_mode, seg_override_en, rep_override_en, trap_flag, int8_asap, scratch_uchar, io_hi_lo, spkr_en;
 	word *regs16, reg_ip, seg_override, file_index, wave_counter;
 	unsigned int op_source, op_dest, rm_addr, op_to_addr, op_from_addr, i_data0, i_data1, i_data2, scratch_uint, scratch2_uint, inst_counter, set_flags_type, GRAPHICS_X, GRAPHICS_Y, pixel_colors[16], vmem_ctr;
-	int op_result, disk[3], scratch_int;
+	int op_result, scratch_int;
+
+	vxt_terminal_t *term;
+	vxt_drive_t *disk[2];
 	
-	vxt_alloc alloc;
+	vxt_alloc_t alloc;
 	time_t clock_buf;
 	struct timeb ms_clock;
+
+	const void *bios;
+	size_t bios_sz;
 };
 
 #ifndef NO_GRAPHICS
@@ -167,24 +166,6 @@ unsigned short vid_addr_lookup[VIDEO_RAM_SIZE], cga_colors[4] = {0 /* Black */, 
 
 // Reinterpretation cast
 #define CAST(a) *(a*)&
-
-// Keyboard driver for console. This may need changing for UNIX/non-UNIX platforms
-#ifdef _WIN32
-#define KEYBOARD_DRIVER kbhit() && (e->mem[0x4A6] = getch(), pc_interrupt(e, 7))
-#else
-#define KEYBOARD_DRIVER read(0, mem + 0x4A6, 1) && (e->int8_asap = (mem[0x4A6] == 0x1B), pc_interrupt(e, 7))
-#endif
-
-// Keyboard driver for SDL
-#ifdef NO_GRAPHICS
-#define SDL_KEYBOARD_DRIVER KEYBOARD_DRIVER
-#else
-//#define SDL_KEYBOARD_DRIVER sdl_screen ? SDL_PollEvent(&sdl_event) && (sdl_event.type == SDL_KEYDOWN || sdl_event.type == SDL_KEYUP) && (scratch_uint = sdl_event.key.keysym.unicode, scratch2_uint = sdl_event.key.keysym.mod, CAST(short)mem[0x4A6] = 0x400 + 0x800*!!(scratch2_uint & KMOD_ALT) + 0x1000*!!(scratch2_uint & KMOD_SHIFT) + 0x2000*!!(scratch2_uint & KMOD_CTRL) + 0x4000*(sdl_event.type == SDL_KEYUP) + ((!scratch_uint || scratch_uint > 0x7F) ? sdl_event.key.keysym.sym : scratch_uint), pc_interrupt(7)) : (KEYBOARD_DRIVER)
-
-// This needs to be fixed. /aj
-#define SDL_KEYBOARD_DRIVER sdl_screen ? SDL_PollEvent(&sdl_event) && (sdl_event.type == SDL_KEYDOWN || sdl_event.type == SDL_KEYUP) && (e->mem[0x4A6] = (unsigned char)tolower(*SDL_GetKeyName(sdl_event.key.keysym.sym)), pc_interrupt(e, 7)) : (KEYBOARD_DRIVER) 
-
-#endif
 
 // Helper functions
 
@@ -280,22 +261,15 @@ static void *default_alloc(void *p, size_t sz)
 	if (p && !sz) free(p);
 }
 
-vxt_emulator_t *vxt_init(vxt_alloc alloc)
+vxt_emulator_t *vxt_init(vxt_terminal_t *term, vxt_drive_t *fd, vxt_drive_t *hd, vxt_alloc_t alloc)
 {
 	alloc = alloc ? alloc : default_alloc;
 	vxt_emulator_t *e = (vxt_emulator_t*)alloc(0, sizeof(vxt_emulator_t));
 	e->alloc = alloc;
-	return e;
-}
+	e->term = term;
+	e->disk[0] = hd;
+	e->disk[1] = fd;
 
-void vxt_close(vxt_emulator_t *e)
-{
-	e->alloc(e, 0);
-}
-
-// Emulator entry point
-int main_vxt(vxt_emulator_t *e, int argc, char **argv)
-{
 #ifndef NO_GRAPHICS
 	// Initialise SDL
 	SDL_Init(SDL_INIT_AUDIO);
@@ -316,25 +290,44 @@ int main_vxt(vxt_emulator_t *e, int argc, char **argv)
 
 	// Set DL equal to the boot device: 0 for the FD, or 0x80 for the HD. Normally, boot from the FD.
 	// But, if the HD image file is prefixed with @, then boot from the HD
-	e->regs8[REG_DL] = ((argc > 3) && (*argv[3] == '@')) ? argv[3]++, 0x80 : 0;
+	e->regs8[REG_DL] = e->disk[0] && e->disk[0]->boot ? 0x80 : 0;
 
-	// Open BIOS (file id disk[2]), floppy disk image (disk[1]), and hard disk image (disk[0]) if specified
-	for (e->file_index = 3; e->file_index;)
-		e->disk[--e->file_index] = *++argv ? open(*argv, 32898) : 0;
+	// Floppy disk image (disk[1]), and hard disk image (disk[0]) if specified.
 
 	// Set CX:AX equal to the hard disk image size, if present
-	CAST(unsigned)e->regs16[REG_AX] = *e->disk ? lseek(*e->disk, 0, 2) >> 9 : 0;
+	CAST(unsigned)e->regs16[REG_AX] = e->disk[0] ? e->disk[0]->seek(e->disk[0]->userdata, 0, 2) >> 9 : 0;
 
-	// Load BIOS image into F000:0100, and set IP to 0100
-	read(e->disk[2], e->regs8 + (e->reg_ip = 0x100), 0xFF00);
+	// Load BIOS image
+	vxt_load_bios(e, bios_bin, sizeof(bios_bin));
 
 	// Load instruction decoding helper table
 	for (int i = 0; i < 20; i++)
 		for (int j = 0; j < 256; j++)
 			e->bios_table_lookup[i][j] = e->regs8[e->regs16[0x81 + i] + j];
 
+	return e;
+}
+
+void vxt_load_bios(vxt_emulator_t *e, const void *data, size_t sz)
+{
+	e->bios = data;
+	e->bios_sz = sz;
+
+	// Load BIOS image into F000:0100, and set IP to 0100
+	memcpy(e->regs8 + (e->reg_ip = 0x100), e->bios, e->bios_sz < 0xFF00 ? e->bios_sz : 0xFF00);
+}
+
+void vxt_close(vxt_emulator_t *e)
+{
+	e->alloc(e, 0);
+}
+
+int vxt_step(vxt_emulator_t *e)
+{
+	vxt_drive_t *scratch_disk;
+
 	// Instruction execution loop. Terminates if CS:IP = 0:0
-	for (; e->opcode_stream = e->mem + 16 * e->regs16[REG_CS] + e->reg_ip, e->opcode_stream != e->mem;)
+	if (e->opcode_stream = e->mem + 16 * e->regs16[REG_CS] + e->reg_ip, e->opcode_stream != e->mem)
 	{
 		// Set up variables to prepare for decoding an opcode
 		set_opcode(e, *e->opcode_stream);
@@ -704,7 +697,7 @@ int main_vxt(vxt_emulator_t *e, int argc, char **argv)
 				switch ((char)e->i_data0)
 				{
 					OPCODE_CHAIN 0: // PUTCHAR_AL
-						write(1, e->regs8, 1)
+						e->term->putchar(e->term->userdata, *e->regs8)
 					OPCODE 1: // GET_RTC
 						time(&e->clock_buf);
 						ftime(&e->ms_clock);
@@ -712,8 +705,9 @@ int main_vxt(vxt_emulator_t *e, int argc, char **argv)
 						CAST(short)e->mem[SEGREG(REG_ES, REG_BX, 36+)] = e->ms_clock.millitm;
 					OPCODE 2: // DISK_READ
 					OPCODE_CHAIN 3: // DISK_WRITE
-						e->regs8[REG_AL] = ~lseek(e->disk[e->regs8[REG_DL]], CAST(unsigned)e->regs16[REG_BP] << 9, 0)
-							? ((char)e->i_data0 == 3 ? (int(*)())write : (int(*)())read)(e->disk[e->regs8[REG_DL]], e->mem + SEGREG(REG_ES, REG_BX,), e->regs16[REG_AX])
+						scratch_disk = e->disk[e->regs8[REG_DL]];
+						e->regs8[REG_AL] = ~scratch_disk->seek(scratch_disk->userdata, CAST(unsigned)e->regs16[REG_BP] << 9, 0)
+							? ((char)e->i_data0 == 3 ? (int(*)())scratch_disk->write : (int(*)())scratch_disk->read)(scratch_disk->userdata, e->mem + SEGREG(REG_ES, REG_BX,), e->regs16[REG_AX])
 							: 0;
 				}
 		}
@@ -804,11 +798,14 @@ int main_vxt(vxt_emulator_t *e, int argc, char **argv)
 		// If a timer tick is pending, interrupts are enabled, and no overrides/REP are active,
 		// then process the tick and check for new keystrokes
 		if (e->int8_asap && !e->seg_override_en && !e->rep_override_en && e->regs8[FLAG_IF] && !e->regs8[FLAG_TF])
-			pc_interrupt(e, 0xA), e->int8_asap = 0, SDL_KEYBOARD_DRIVER;
+		{
+			pc_interrupt(e, 0xA), e->int8_asap = 0;
+			if (e->term->kbhit(e->term->userdata))
+				e->mem[0x4A6] = e->term->getch(e->term->userdata), pc_interrupt(e, 7);
+		}
+
+		return 1;
 	}
 
-#ifndef NO_GRAPHICS
-	SDL_Quit();
-#endif
 	return 0;
 }

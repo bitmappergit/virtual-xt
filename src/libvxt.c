@@ -88,6 +88,7 @@ struct vxt_emulator {
 	word vid_addr_lookup[VIDEO_RAM_SIZE], *regs16, reg_ip, seg_override, file_index, wave_counter;
 	unsigned int op_source, op_dest, rm_addr, op_to_addr, op_from_addr, i_data0, i_data1, i_data2, scratch_uint, scratch2_uint, inst_counter, set_flags_type, GRAPHICS_X, GRAPHICS_Y, pixel_colors[16], vmem_ctr;
 	int op_result, scratch_int;
+	void *mem_block;
 	
 	vxt_terminal_t *term;
 	vxt_video_t *video;
@@ -95,7 +96,6 @@ struct vxt_emulator {
 	
 	vxt_drive_t *disk[2];
 	vxt_clock_t *clock;
-	vxt_alloc_t alloc;
 
 	byte audio_silence;
 	vxt_pause_audio_t pause_audio;
@@ -234,41 +234,17 @@ static int AAA_AAS(vxt_emulator_t *e, char which_operation)
 	return (e->regs16[REG_AX] += 262 * which_operation*set_AF(e, set_CF(e, ((e->regs8[REG_AL] & 0x0F) > 9) || e->regs8[FLAG_AF])), e->regs8[REG_AL] &= 0x0F);
 }
 
-static void *default_alloc(void *p, size_t sz)
+vxt_emulator_t *vxt_open(vxt_terminal_t *term, vxt_clock_t *clock, void *mem)
 {
-	if (!p) return malloc(sz);
-	if (p && sz) return realloc(p, sz);
-	if (p && !sz) free(p);
-}
-
-vxt_emulator_t *vxt_init(vxt_terminal_t *term, vxt_clock_t *clock, vxt_drive_t *fd, vxt_alloc_t alloc)
-{
-	alloc = alloc ? alloc : default_alloc;
-	vxt_emulator_t *e = (vxt_emulator_t*)alloc(0, sizeof(vxt_emulator_t));
-	e->alloc = alloc;
-	e->clock = clock;
-	e->term = term;
-	e->pause_audio = 0;
-	e->audio_silence = 0;
-	e->video = 0;
-	e->window = 0;
-	e->disk[0] = 0;
-	e->disk[1] = fd;
+	vxt_emulator_t *e = (vxt_emulator_t*)mem;
+	if (!e) { e = (vxt_emulator_t*)calloc(1, sizeof(vxt_emulator_t)); e->mem_block = e; } else memset(e, 0, sizeof(vxt_emulator_t));
+	e->clock = clock; e->term = term;
 
 	// regs16 and reg8 point to F000:0, the start of memory-mapped registers. CS is initialised to F000
 	e->regs16 = (unsigned short *)(e->regs8 = e->mem + REGS_BASE);
 	e->regs16[REG_CS] = 0xF000;
-
-	// Trap flag off
-	e->regs8[FLAG_TF] = 0;
-
-	// Set DL equal to the boot device: 0 for the FD, or 0x80 for the HD. Normally, boot from the FD.
-	e->regs8[REG_DL] = 0;
-
-	// Floppy disk image (disk[1]), and hard disk image (disk[0]) if specified.
-
-	// Set CX:AX equal to the hard disk image size, if present
-	CAST(unsigned)e->regs16[REG_AX] = e->disk[0] ? e->disk[0]->seek(e->disk[0]->userdata, 0, 2) >> 9 : 0;
+	e->regs8[FLAG_TF] = 0; // Trap flag off
+	e->regs8[REG_DL] = 0; // Set DL equal to the boot device: 0 for the FD, or 0x80 for the HD. Normally, boot from the FD.
 
 	// Load BIOS image
 	vxt_load_bios(e, bios_bin, sizeof(bios_bin));
@@ -298,18 +274,31 @@ void vxt_load_bios(vxt_emulator_t *e, const void *data, size_t sz)
 }
 
 void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd) {
-	e->regs8[REG_DL] = hd->boot ? 0x80 : 0;
+	// Set CX:AX equal to the hard disk image size
+	CAST(unsigned)e->regs16[REG_AX] = hd->seek(hd->userdata, 0, 2) >> 9;
+	e->regs8[REG_DL] = hd->boot || !e->disk[1] ? 0x80 : 0;
 	e->disk[0] = hd;
+}
+
+void vxt_replace_floppy(vxt_emulator_t *e, vxt_drive_t *fd) {
+	if (!fd) return;
+	// Floppy disk image (disk[1]), and hard disk image (disk[0]) if specified.
+	if (fd->boot && (!e->disk[0] || !e->disk[1])) e->regs8[REG_DL] = 0;
+	e->disk[1] = fd;
 }
 
 void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac) { e->pause_audio = ac; }
 void vxt_set_audio_silence(vxt_emulator_t *e, unsigned char s) { e->audio_silence = s; }
 void vxt_set_video(vxt_emulator_t *e, vxt_video_t *video) { e->video = video; }
-void vxt_close(vxt_emulator_t *e) { e->alloc(e, 0); }
+void vxt_close(vxt_emulator_t *e) { if (e->mem_block) free(e->mem_block); }
+size_t vxt_memory_required() { return sizeof(vxt_emulator_t); }
 
 int vxt_step(vxt_emulator_t *e)
 {
 	vxt_drive_t *scratch_disk;
+
+	// We have no boot media!
+	if (!e->disk[0] && !e->disk[1]) return 0;
 
 	// Instruction execution loop. Terminates if CS:IP = 0:0
 	if (e->opcode_stream = e->mem + 16 * e->regs16[REG_CS] + e->reg_ip, e->opcode_stream != e->mem)

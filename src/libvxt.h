@@ -10,13 +10,16 @@
 #include <stddef.h>
 #include <time.h>
 
-#define VXT_DEFAULT_ALLOCATOR 0
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define VXT_INTERNAL_MEMORY 0
 #ifndef VXT_GRAPHICS_UPDATE_DELAY
     #define VXT_GRAPHICS_UPDATE_DELAY 360000
 #endif
 
 typedef struct vxt_emulator vxt_emulator_t;
-typedef void* (*vxt_alloc_t)(void*,size_t);
 typedef void (*vxt_pause_audio_t)(int);
 
 typedef enum {
@@ -56,8 +59,10 @@ typedef struct {
     size_t (*seek)(void*,size_t,int);
 } vxt_drive_t;
 
-extern vxt_emulator_t *vxt_init(vxt_terminal_t *term, vxt_clock_t *clock, vxt_drive_t *fd, vxt_alloc_t alloc);
+extern vxt_emulator_t *vxt_open(vxt_terminal_t *term, vxt_clock_t *clock, void *mem);
+extern size_t vxt_memory_required();
 extern void vxt_load_bios(vxt_emulator_t *e, const void *data, size_t sz);
+extern void vxt_replace_floppy(vxt_emulator_t *e, vxt_drive_t *fd);
 extern void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd);
 extern void vxt_set_video(vxt_emulator_t *e, vxt_video_t *video);
 extern void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac);
@@ -68,4 +73,7 @@ extern void vxt_close(vxt_emulator_t *e);
 // Expects single channel, 44100Hz, unsigned bytes
 extern void vxt_audio_callback(vxt_emulator_t *e, unsigned char *stream, int len);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

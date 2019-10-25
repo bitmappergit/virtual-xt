@@ -11,7 +11,7 @@ function create_project(k)
     platforms { 'native', 'x32', 'x64' }
     includedirs { 'src' }
 
-    if wall then flags { 'ExtraWarnings'} --[[, 'FatalWarnings' }]] end
+    if wall then flags { 'ExtraWarnings'} end
 
     if k == 'ConsoleApp' then
         files { 'src/virtualxt.c' }
@@ -35,6 +35,9 @@ solution 'VirtualXT'
 
     configuration 'Debug'
         flags { 'Symbols' }
+
+    configuration 'vs*'
+        defines { '_CRT_SECURE_NO_WARNINGS' }
 
     configuration 'gmake'
         buildoptions { '-fsigned-char -std=c99' }

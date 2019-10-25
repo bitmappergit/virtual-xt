@@ -7,12 +7,14 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <unistd.h>
 #include <time.h>
 #include <sys/timeb.h>
 
+#define VERSION_STRING "0.0.1"
+
 #ifdef _WIN32
 	#include <windows.h>
+	#include <io.h>
 	#include <conio.h>
 	#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
 		#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
@@ -21,6 +23,8 @@
 	static int ___kbhit(void *ud) { return kbhit(); }
 	static int ___getch(void *ud) { return getch(); }
 #else
+	#include <unistd.h>
+
 	unsigned char unix_key = 0;
 	static int ___kbhit(void *ud) { return read(0, &unix_key, 1); }
 	static int ___getch(void *ud) { return (int)unix_key; }
@@ -87,7 +91,11 @@ static unsigned char *video_buffer(void *ud, void *w) {
 	return sdl_surface->pixels;
 }
 
+static void quit_sdl() { if (sdl_window || sdl_surface) close_window(0, 0); SDL_Quit(); }
+
 #endif
+
+static void clear_screen() { printf("\033[2J\033[H"); }
 
 static size_t ___read(void *ud, void* buf, size_t count) { return (size_t)read((int)(intptr_t)ud, buf, count); }
 static size_t ___write(void *ud, const void *buf, size_t count) { return (size_t)write((int)(intptr_t)ud, buf, count); }
@@ -96,8 +104,29 @@ static size_t ___seek(void *ud, size_t offset, int whence) { return (size_t)lsee
 static struct tm *___localtime(void *ud) { time((time_t*)ud); return localtime((time_t*)ud); }
 static unsigned short ___millitm(void *ud) { struct timeb c; ftime(&c); return c.millitm; }
 
+vxt_emulator_t *e = 0;
+static void close_emulator() { if (e) vxt_close(e); }
+
+static void print_help()
+{
+	printf("VirtualXT - IBM PC/XT Emulator\n");
+	printf("By Andreas T Jonsson\n\n");
+	printf("Version: " VERSION_STRING "\n\n");
+
+	printf("TODO: Add help text.\n");
+}
+
 int main(int argc, char *argv[])
 {
+	const char *fd_arg = 0, *hd_arg = 0; 
+	while (--argc && ++argv) {
+		if (!strcmp(*argv, "-h")) { print_help(); return 0; }
+		if (!strcmp(*argv, "-v")) { printf(VERSION_STRING "\n"); return 0; }
+		if (!strcmp(*argv, "-fd")) { fd_arg = argc-- ? *(++argv) : fd_arg; continue; }
+		if (!strcmp(*argv, "-hd")) { hd_arg = argc-- ? *(++argv) : hd_arg; continue; }
+		printf("Invalid parameter: %s\n", *argv); return -1;
+	}
+
 	#ifdef _WIN32
 		DWORD dwMode = 0;
 		HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -106,14 +135,6 @@ int main(int argc, char *argv[])
 		if (!SetConsoleMode(hOut, dwMode|ENABLE_VIRTUAL_TERMINAL_PROCESSING)) return GetLastError();
 	#endif
 
-	vxt_drive_t fd = {
-		.userdata = (void*)(intptr_t)open(argv[1], 32898),
-		.boot = 1,
-		.read = ___read,
-		.write = ___write,
-		.seek = ___seek
-	};
-
 	time_t clock_buf;
 	vxt_clock_t clock = {
 		.userdata = &clock_buf,
@@ -121,10 +142,39 @@ int main(int argc, char *argv[])
 		.millitm = ___millitm
 	};
 
-	vxt_emulator_t *e = vxt_init(&term, &clock, &fd, VXT_DEFAULT_ALLOCATOR);
+	e = vxt_open(&term, &clock, VXT_INTERNAL_MEMORY);
+	atexit(close_emulator);
+
+	vxt_drive_t fd = {
+		.boot = 1,
+		.read = ___read,
+		.write = ___write,
+		.seek = ___seek
+	};
+
+	if (fd_arg)
+	{
+		int f = open(fd_arg, 32898);
+		if (f == -1) { printf("Can't open FD image: %s\n", fd_arg); return -1; }
+		fd.userdata = (void*)(intptr_t)f,
+		vxt_replace_floppy(e, &fd);
+	}
+
+	vxt_drive_t hd = fd;
+
+	if (hd_arg)
+	{
+		int f = open(hd_arg, 32898);
+		if (f == -1) { printf("Can't open HD image: %s\n", hd_arg); return -1; }
+		hd.userdata = (void*)(intptr_t)f,
+		hd.boot = 0;
+		vxt_set_harddrive(e, &hd);
+	}
 
 	#ifndef NO_SDL
 		SDL_Init(SDL_INIT_AUDIO);
+		atexit(quit_sdl);
+
 		sdl_audio.callback = (SDL_AudioCallback)vxt_audio_callback;
 		sdl_audio.userdata = (void*)e;
 		#ifdef _WIN32
@@ -144,6 +194,9 @@ int main(int argc, char *argv[])
 		vxt_set_video(e, &video);
 	#endif
 
+	clear_screen();
+	atexit(clear_screen);
+
 	while (vxt_step(e))
 	{
 		#ifndef NO_SDL
@@ -158,9 +211,4 @@ int main(int argc, char *argv[])
 			SDL_PumpEvents();
 		#endif
 	}
-
-	#ifndef NO_SDL
-		if (sdl_window || sdl_surface) close_window(0, 0);
-		SDL_Quit();
-	#endif
 }

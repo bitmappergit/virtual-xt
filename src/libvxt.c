@@ -99,9 +99,6 @@ struct vxt_emulator {
 
 	byte audio_silence;
 	vxt_pause_audio_t pause_audio;
-
-	const void *bios;
-	size_t bios_sz;
 };
 
 const word cga_colors[4] = {0 /* Black */, 0x1F1F /* Cyan */, 0xE3E3 /* Magenta */, 0xFFFF /* White */};
@@ -249,11 +246,6 @@ vxt_emulator_t *vxt_open(vxt_terminal_t *term, vxt_clock_t *clock, void *mem)
 	// Load BIOS image
 	vxt_load_bios(e, bios_bin, sizeof(bios_bin));
 
-	// Load instruction decoding helper table
-	for (int i = 0; i < 20; i++)
-		for (int j = 0; j < 256; j++)
-			e->bios_table_lookup[i][j] = e->regs8[e->regs16[0x81 + i] + j];
-
 	return e;
 }
 
@@ -266,11 +258,13 @@ void vxt_audio_callback(vxt_emulator_t *e, unsigned char *stream, int len)
 
 void vxt_load_bios(vxt_emulator_t *e, const void *data, size_t sz)
 {
-	e->bios = data;
-	e->bios_sz = sz;
-
 	// Load BIOS image into F000:0100, and set IP to 0100
-	memcpy(e->regs8 + (e->reg_ip = 0x100), e->bios, e->bios_sz < 0xFF00 ? e->bios_sz : 0xFF00);
+	memcpy(e->regs8 + (e->reg_ip = 0x100), data, sz < 0xFF00 ? sz : 0xFF00);
+
+	// Load instruction decoding helper table
+	for (int i = 0; i < 20; i++)
+		for (int j = 0; j < 256; j++)
+			e->bios_table_lookup[i][j] = e->regs8[e->regs16[0x81 + i] + j];
 }
 
 void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd) {

@@ -16,6 +16,7 @@
 	#include <windows.h>
 	#include <io.h>
 	#include <conio.h>
+	
 	#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
 		#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
 	#endif
@@ -38,6 +39,8 @@ vxt_terminal_t term = {
 	.getch = ___getch,
 	.putchar = ___putchar
 };
+
+char bios_buff[0xFFFF];
 
 #ifndef NO_SDL
 
@@ -118,12 +121,13 @@ static void print_help()
 
 int main(int argc, char *argv[])
 {
-	const char *fd_arg = 0, *hd_arg = 0; 
+	const char *fd_arg = 0, *hd_arg = 0, *bios_arg = 0; 
 	while (--argc && ++argv) {
 		if (!strcmp(*argv, "-h")) { print_help(); return 0; }
 		if (!strcmp(*argv, "-v")) { printf(VERSION_STRING "\n"); return 0; }
-		if (!strcmp(*argv, "-fd")) { fd_arg = argc-- ? *(++argv) : fd_arg; continue; }
-		if (!strcmp(*argv, "-hd")) { hd_arg = argc-- ? *(++argv) : hd_arg; continue; }
+		if (!strcmp(*argv, "-f")) { fd_arg = argc-- ? *(++argv) : fd_arg; continue; }
+		if (!strcmp(*argv, "-d")) { hd_arg = argc-- ? *(++argv) : hd_arg; continue; }
+		if (!strcmp(*argv, "--bios")) { bios_arg = argc-- ? *(++argv) : bios_arg; continue; }
 		printf("Invalid parameter: %s\n", *argv); return -1;
 	}
 
@@ -169,6 +173,14 @@ int main(int argc, char *argv[])
 		hd.userdata = (void*)(intptr_t)f,
 		hd.boot = 0;
 		vxt_set_harddrive(e, &hd);
+	}
+
+	if (bios_arg)
+	{
+		FILE *fp = fopen(bios_arg, "rb");
+		if (!fp) { printf("Can't open BIOS image: %s\n", bios_arg); return -1; }
+		vxt_load_bios(e, bios_buff, fread(bios_buff, 1, sizeof(bios_buff), fp));
+		fclose(fp);
 	}
 
 	#ifndef NO_SDL

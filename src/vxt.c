@@ -4,12 +4,13 @@
 //
 // This work is licensed under the MIT License. See included LICENSE file.
 
-#include "libvxt.h"
+#include <vxt.h>
 #include "bios.bin.h"
 
 #include <time.h>
 #include <malloc.h>
 #include <memory.h>
+#include <stdio.h>
 
 // Emulator system constants
 #define IO_PORT_COUNT 0x10000
@@ -19,6 +20,24 @@
 
 // Timer/keyboard update delays (explained later)
 #define KEYBOARD_TIMER_UPDATE_DELAY 20000
+
+// Serial port addresses
+#define COM1_BASE 0x3F8
+#define COM2_BASE 0x2F8
+#define COM3_BASE 0x3E8
+#define COM4_BASE 0x2E8
+
+// Serial port IO offsets
+#define SERIAL_DATA 0
+#define SERIAL_DLAB_LOW 0
+#define SERIAL_INTERRUPT_ENABLE 1
+#define SERIAL_DLAB_HIGH 1
+#define SERIAL_FIFO_CONTROL 2
+#define SERIAL_LINE_CONTROL 3
+#define SERIAL_MODEM_CONTROL 4
+#define SERIAL_LINE_STATUS 5
+#define SERIAL_MODEM_STATUS 6
+#define SERIAL_SCRATCH 7
 
 // 16-bit register decodes
 #define REG_AX 0
@@ -99,6 +118,8 @@ struct vxt_emulator {
 
 	byte audio_silence;
 	vxt_pause_audio_t pause_audio;
+
+	vxt_port_map_t *port_map;
 };
 
 const word cga_colors[4] = {0 /* Black */, 0x1F1F /* Cyan */, 0xE3E3 /* Magenta */, 0xFFFF /* White */};
@@ -284,6 +305,7 @@ void vxt_replace_floppy(vxt_emulator_t *e, vxt_drive_t *fd) {
 void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac) { e->pause_audio = ac; }
 void vxt_set_audio_silence(vxt_emulator_t *e, unsigned char s) { e->audio_silence = s; }
 void vxt_set_video(vxt_emulator_t *e, vxt_video_t *video) { e->video = video; }
+void vxt_set_port_map(vxt_emulator_t *e, vxt_port_map_t *map) { e->port_map = map; }
 void vxt_close(vxt_emulator_t *e) { if (e->mem_block) free(e->mem_block); }
 size_t vxt_memory_required() { return sizeof(vxt_emulator_t); }
 
@@ -578,6 +600,7 @@ int vxt_step(vxt_emulator_t *e)
 				e->scratch_uint = e->extra ? e->regs16[REG_DX] : (unsigned char)e->i_data0;
 				e->scratch_uint == 0x60 && (e->io_ports[0x64] = 0); // Scancode read flag
 				e->scratch_uint == 0x3D5 && (e->io_ports[0x3D4] >> 1 == 7) && (e->io_ports[0x3D5] = ((e->mem[0x49E]*80 + e->mem[0x49D] + CAST(short)e->mem[0x4AD]) & (e->io_ports[0x3D4] & 1 ? 0xFF : 0xFF00)) >> (e->io_ports[0x3D4] & 1 ? 0 : 8)); // CRT cursor position
+				e->port_map && e->port_map->filter(e->port_map->userdata, e->scratch_uint, 0) && (e->io_ports[e->scratch_uint] = e->port_map->in(e->port_map->userdata, e->scratch_uint));
 				R_M_OP(e->regs8[REG_AL], =, e->io_ports[e->scratch_uint]);
 			OPCODE 22: // OUT DX/imm8, AL/AX
 				e->scratch_uint = e->extra ? e->regs16[REG_DX] : (unsigned char)e->i_data0;
@@ -589,6 +612,7 @@ int vxt_step(vxt_emulator_t *e)
 				e->scratch_uint == 0x3D5 && (e->io_ports[0x3D4] >> 1 == 7) && (e->scratch2_uint = ((e->mem[0x49E]*80 + e->mem[0x49D] + CAST(short)e->mem[0x4AD]) & (e->io_ports[0x3D4] & 1 ? 0xFF00 : 0xFF)) + (e->regs8[REG_AL] << (e->io_ports[0x3D4] & 1 ? 0 : 8)) - CAST(short)e->mem[0x4AD], e->mem[0x49D] = e->scratch2_uint % 80, e->mem[0x49E] = e->scratch2_uint / 80); // CRT cursor position
 				e->scratch_uint == 0x3B5 && e->io_ports[0x3B4] == 1 && (e->GRAPHICS_X = e->regs8[REG_AL] * 16); // Hercules resolution reprogramming. Defaults are set in the BIOS
 				e->scratch_uint == 0x3B5 && e->io_ports[0x3B4] == 6 && (e->GRAPHICS_Y = e->regs8[REG_AL] * 4);
+				e->port_map && e->port_map->filter(e->port_map->userdata, e->scratch_uint, 1) && (e->port_map->out(e->port_map->userdata, e->scratch_uint, e->regs8[REG_AL]), 0);				
 			OPCODE 23: // REPxx
 				e->rep_override_en = 2;
 				e->rep_mode = e->i_w;
@@ -669,10 +693,21 @@ int vxt_step(vxt_emulator_t *e)
 						CAST(short)e->mem[SEGREG(REG_ES, REG_BX, 36+)] = e->clock->millitm(e->clock->userdata);
 					OPCODE 2: // DISK_READ
 					OPCODE_CHAIN 3: // DISK_WRITE
-						scratch_disk = e->disk[e->regs8[REG_DL]];
-						e->regs8[REG_AL] = ~scratch_disk->seek(scratch_disk->userdata, CAST(unsigned)e->regs16[REG_BP] << 9, 0)
-							? ((char)e->i_data0 == 3 ? (int(*)())scratch_disk->write : (int(*)())scratch_disk->read)(scratch_disk->userdata, e->mem + SEGREG(REG_ES, REG_BX,), e->regs16[REG_AX])
-							: 0;
+						if (e->disk[e->regs8[REG_DL]])
+						{
+							scratch_disk = e->disk[e->regs8[REG_DL]];
+							e->regs8[REG_AL] = ~scratch_disk->seek(scratch_disk->userdata, CAST(unsigned)e->regs16[REG_BP] << 9, 0)
+								? ((char)e->i_data0 == 3 ? (int(*)())scratch_disk->write : (int(*)())scratch_disk->read)(scratch_disk->userdata, e->mem + SEGREG(REG_ES, REG_BX,), e->regs16[REG_AX])
+								: 0;
+						} else e->regs8[REG_AL] = 0;
+					OPCODE 4: // DEBUG
+						printf(
+							"\nAX: 0x%X (0x%X,0x%X),\tBX: 0x%X (0x%X,0x%X)\nCX: 0x%X (0x%X,0x%X),\tDX: 0x%X (0x%X,0x%X)\n",
+							e->regs16[REG_AX], e->regs8[REG_AL], e->regs8[REG_AH],
+							e->regs16[REG_BX], e->regs8[REG_BL], e->regs8[REG_BH],
+							e->regs16[REG_CX], e->regs8[REG_CL], e->regs8[REG_CH],
+							e->regs16[REG_DX], e->regs8[REG_DL], e->regs8[REG_DH]
+						);
 				}
 		}
 
@@ -747,8 +782,12 @@ int vxt_step(vxt_emulator_t *e)
 		if (e->int8_asap && !e->seg_override_en && !e->rep_override_en && e->regs8[FLAG_IF] && !e->regs8[FLAG_TF])
 		{
 			pc_interrupt(e, 0xA), e->int8_asap = 0;
-			if (e->term->kbhit(e->term->userdata))
-				CAST(short)e->mem[0x4A6] = e->term->getch(e->term->userdata), pc_interrupt(e, 7);
+			vxt_key_t key = e->term->getkey(e->term->userdata);
+			if (key.scancode) {
+				e->mem[0x4A6] = key.scancode;
+				e->mem[0x4A6+1] = key.ascii;
+				pc_interrupt(e, 7);
+			}
 		}
 
 		return 1;

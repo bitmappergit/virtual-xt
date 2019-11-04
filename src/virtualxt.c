@@ -3,17 +3,20 @@
 //
 // This work is licensed under the MIT License. See included LICENSE file.
 
-#include "libvxt.h"
+#include "vxt.h"
+#include "toscan.h"
 
 #include <stdio.h>
 #include <stdint.h>
 #include <time.h>
 #include <sys/timeb.h>
+#include <assert.h>
 
 #define VERSION_STRING "0.0.1"
 
 #ifdef _WIN32
 	#include <windows.h>
+	#include <WinUser.h>
 	#include <io.h>
 	#include <conio.h>
 	
@@ -21,8 +24,73 @@
 		#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
 	#endif
 
-	static int ___kbhit(void *ud) { return kbhit(); }
-	static int ___getch(void *ud) { return getch(); }
+	static vxt_key_t term_getkey(void *ud) {
+		INPUT_RECORD event;
+		DWORD count = 0;
+		HANDLE hstdin = GetStdHandle(STD_INPUT_HANDLE);
+
+		while (1)
+		{
+			vxt_key_t key = {.scancode = VXT_KEY_INVALID, .ascii = 0x20};
+			GetNumberOfConsoleInputEvents(hstdin, &count);
+			if (!count) return key;
+
+			ReadConsoleInput(hstdin, &event, 1, &count);
+			if (count > 0 && event.EventType == KEY_EVENT)
+			{
+				KEY_EVENT_RECORD *ke = &event.Event.KeyEvent;
+				key.scancode = ke->bKeyDown ? 0 : VXT_MASK_KEY_UP;
+
+				switch (ke->wVirtualKeyCode)
+				{
+					case VK_ESCAPE: key.scancode |= VXT_KEY_ESCAPE; key.ascii = 0x1B; return key;
+					case VK_BACK: key.scancode |= VXT_KEY_BACKSPACE; key.ascii = 0x8; return key;
+					case VK_TAB: key.scancode |= VXT_KEY_TAB; key.ascii = '\t'; return key;
+					case VK_RETURN: key.scancode |= VXT_KEY_ENTER; key.ascii = '\r'; return key;
+					case VK_CONTROL: key.scancode |= VXT_KEY_CONTROL; return key;
+					case VK_SHIFT: case VK_LSHIFT: key.scancode |= VXT_KEY_LSHIFT; return key;
+					case VK_RSHIFT: key.scancode |= VXT_KEY_RSHIFT; return key;
+					case VK_PRINT: key.scancode |= VXT_KEY_PRINT; return key;
+					case VK_MENU: key.scancode |= VXT_KEY_ALT; return key;
+					case VK_CAPITAL: key.scancode |= VXT_KEY_CAPSLOCK; return key;
+					case VK_NUMLOCK: key.scancode |= VXT_KEY_NUMLOCK; return key;
+					case VK_SCROLL: key.scancode |= VXT_KEY_SCROLLOCK; return key;
+					case VK_HOME: case VK_NUMPAD7: key.scancode |= VXT_KEY_KP_HOME_7; return key;
+					case VK_UP: case VK_NUMPAD8: key.scancode |= VXT_KEY_KP_UP_8; return key;
+					case VK_NUMPAD9: key.scancode |= VXT_KEY_KP_PAGEUP_9; return key;
+					//case VK_NUMPAD9: key.scancode |= VXT_KEY_KP_MINUS; return key;
+					case VK_LEFT: case VK_NUMPAD4: key.scancode |= VXT_KEY_KP_LEFT_4; return key;
+					case VK_NUMPAD5: key.scancode |= VXT_KEY_KP_5; return key;
+					case VK_RIGHT: case VK_NUMPAD6: key.scancode |= VXT_KEY_KP_RIGHT_6; return key;
+					//case VK_NUMPAD9: key.scancode |= VXT_KEY_KP_PLUS; return key;
+					case VK_END: case VK_NUMPAD1: key.scancode |= VXT_KEY_KP_END_1; return key;
+					case VK_DOWN: case VK_NUMPAD2: key.scancode |= VXT_KEY_KP_DOWN_2; return key;
+					case VK_NUMPAD3: key.scancode |= VXT_KEY_KP_PAGEDOWN_3; return key;
+					case VK_INSERT: key.scancode |= VXT_KEY_KP_INSERT; return key;
+					case VK_F1: key.scancode |= VXT_KEY_F1; return key;
+					case VK_F2: key.scancode |= VXT_KEY_F2; return key;
+					case VK_F3: key.scancode |= VXT_KEY_F3; return key;
+					case VK_F4: key.scancode |= VXT_KEY_F4; return key;
+					case VK_F5: key.scancode |= VXT_KEY_F5; return key;
+					case VK_F6: key.scancode |= VXT_KEY_F6; return key;
+					case VK_F7: key.scancode |= VXT_KEY_F7; return key;
+					case VK_F8: key.scancode |= VXT_KEY_F8; return key;
+					case VK_F9: key.scancode |= VXT_KEY_F9; return key;
+					case VK_F10: key.scancode |= VXT_KEY_F10; return key;
+					default:
+					{
+						char ch = ke->uChar.AsciiChar;
+						if (ch >= 0x20 && ch <= 0x7F) {
+							key.scancode |= ascii2scan[ch - 0x20];
+							key.ascii = ch;
+							return key;
+						}
+					}
+				}
+			}
+		}
+	}
+
 #else
 	#include <fcntl.h>
 	
@@ -31,13 +99,12 @@
 	static int ___getch(void *ud) { return (int)unix_key; }
 #endif
 
-static void ___putchar(void *ud, int ch) { putchar(ch); }
+static void term_putchar(void *ud, unsigned char ch) { putchar(ch); }
 
 vxt_terminal_t term = {
 	.userdata = 0,
-	.kbhit = ___kbhit,
-	.getch = ___getch,
-	.putchar = ___putchar
+	.getkey = term_getkey,
+	.putchar = term_putchar
 };
 
 char bios_buff[0xFFFF];
@@ -56,17 +123,25 @@ char bios_buff[0xFFFF];
 SDL_Window *sdl_window = 0;
 SDL_Surface *sdl_surface = 0;
 SDL_AudioSpec sdl_audio = {44100, AUDIO_U8, 1, 0, 128};
-int sdl_has_key = 0, sdl_key = 0;
 
-static int sdl_kbhit(void *ud) {
-	if (sdl_has_key) return sdl_has_key;
-	if (sdl_has_key = ___kbhit(0)) sdl_key = ___getch(0);
-	return sdl_has_key;
-}
+static vxt_key_t sdl_getkey(void *ud)
+{
+	vxt_key_t key = {.scancode = VXT_KEY_INVALID, .ascii = 0x20};
+	if (sdl_window)
+	{
+		SDL_Event ev;
+		while (SDL_PollEvent(&ev))
+		{
+			if (ev.type != SDL_KEYDOWN && ev.type != SDL_KEYUP)
+				continue;	 
 
-static int sdl_getch(void *ud) {
-	sdl_has_key = 0;
-	return sdl_key;
+			key.scancode = ev.type == SDL_KEYDOWN ? 0 : VXT_MASK_KEY_UP;
+			key.scancode |= sdl_to_scancode(ev.key.keysym.sym);
+			key.ascii = sdl_to_ascii(ev.key.keysym.sym);
+			return key;
+		}
+	}
+	return key;
 }
 
 static void *open_window(void *ud, vxt_mode_t m, int x, int y)
@@ -74,8 +149,7 @@ static void *open_window(void *ud, vxt_mode_t m, int x, int y)
 	SDL_Init(SDL_INIT_VIDEO);
 	sdl_window = SDL_CreateWindow(m == VXT_CGA ? "VirtualXT (CGA)" : "VirtualXT (Hercules)", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, x, y, SDL_WINDOW_INPUT_FOCUS|SDL_WINDOW_MOUSE_FOCUS);
 	sdl_surface = SDL_CreateRGBSurface(0, x, y, 8, 0xE0, 0x1C, 0x3, 0x0);
-
-	term.kbhit = sdl_kbhit, term.getch = sdl_getch;
+	term.getkey = sdl_getkey;
 }
 
 static void close_window(void *ud, void *w)
@@ -83,12 +157,11 @@ static void close_window(void *ud, void *w)
 	SDL_FreeSurface(sdl_surface), sdl_surface = 0;
 	SDL_DestroyWindow(sdl_window), sdl_window = 0;
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
-
-	term.kbhit = ___kbhit, term.getch = ___getch;
-	sdl_has_key = 0, sdl_key = 0;
+	term.getkey = term_getkey;
 }
 
-static unsigned char *video_buffer(void *ud, void *w) {
+static unsigned char *video_buffer(void *ud, void *w)
+{
 	SDL_BlitSurface(sdl_surface, 0, SDL_GetWindowSurface(sdl_window), 0);
 	SDL_UpdateWindowSurface(sdl_window);
 	return sdl_surface->pixels;
@@ -107,6 +180,11 @@ static size_t ___seek(void *ud, size_t offset, int whence) { return (size_t)lsee
 static struct tm *___localtime(void *ud) { time((time_t*)ud); return localtime((time_t*)ud); }
 static unsigned short ___millitm(void *ud) { struct timeb c; ftime(&c); return c.millitm; }
 
+// Serial port COM1, 0x3F8 - 0x3FF
+static int com1_filter(void *ud, unsigned short addr, int in) { return addr >= 0x3F8 && addr <= 0x3FF; }
+static unsigned char com1_in(void *ud, unsigned short addr) { return 0; }
+static void com1_out(void *ud,unsigned short addr, unsigned char data) {}
+
 vxt_emulator_t *e = 0;
 static void close_emulator() { if (e) vxt_close(e); }
 
@@ -121,20 +199,22 @@ static void print_help()
 
 int main(int argc, char *argv[])
 {
-	const char *fd_arg = 0, *hd_arg = 0, *bios_arg = 0; 
+	int hdboot_arg = 0;
+	const char *fd_arg = 0, *hd_arg = 0, *bios_arg = 0;
 	while (--argc && ++argv) {
 		if (!strcmp(*argv, "-h")) { print_help(); return 0; }
 		if (!strcmp(*argv, "-v")) { printf(VERSION_STRING "\n"); return 0; }
 		if (!strcmp(*argv, "-f")) { fd_arg = argc-- ? *(++argv) : fd_arg; continue; }
 		if (!strcmp(*argv, "-d")) { hd_arg = argc-- ? *(++argv) : hd_arg; continue; }
+		if (!strcmp(*argv, "--hdboot")) { hdboot_arg = 1; continue; }
 		if (!strcmp(*argv, "--bios")) { bios_arg = argc-- ? *(++argv) : bios_arg; continue; }
 		printf("Invalid parameter: %s\n", *argv); return -1;
 	}
 
 	#ifdef _WIN32
-		DWORD dwMode = 0;
 		HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 		if (hOut == INVALID_HANDLE_VALUE) return GetLastError();
+		DWORD dwMode = 0;
 		if (!GetConsoleMode(hOut, &dwMode)) return GetLastError();
 		if (!SetConsoleMode(hOut, dwMode|ENABLE_VIRTUAL_TERMINAL_PROCESSING)) return GetLastError();
 	#endif
@@ -149,8 +229,16 @@ int main(int argc, char *argv[])
 	e = vxt_open(&term, &clock, VXT_INTERNAL_MEMORY);
 	atexit(close_emulator);
 
+	vxt_port_map_t com1 = {
+		.userdata = 0,
+		.filter = com1_filter,
+		.in = com1_in,
+		.out = com1_out
+	};
+	vxt_set_port_map(e, &com1);
+
 	vxt_drive_t fd = {
-		.boot = 1,
+		.boot = !hdboot_arg,
 		.read = ___read,
 		.write = ___write,
 		.seek = ___seek
@@ -171,7 +259,7 @@ int main(int argc, char *argv[])
 		int f = open(hd_arg, 32898);
 		if (f == -1) { printf("Can't open HD image: %s\n", hd_arg); return -1; }
 		hd.userdata = (void*)(intptr_t)f,
-		hd.boot = 0;
+		hd.boot = hdboot_arg;
 		vxt_set_harddrive(e, &hd);
 	}
 
@@ -212,14 +300,6 @@ int main(int argc, char *argv[])
 	while (vxt_step(e))
 	{
 		#ifndef NO_SDL
-			if (sdl_window)
-			{
-				SDL_Event ev;
-				while (SDL_PollEvent(&ev))
-					if (ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP)
-						sdl_key = ev.key.keysym.sym, sdl_has_key = 1;
-			}
-
 			SDL_PumpEvents();
 		#endif
 	}

@@ -28,6 +28,10 @@
 	db	0x0f, 0x03
 %endmacro
 
+%macro	extended_debug 0
+	db	0x0f, 0x04
+%endmacro
+
 org	100h				; BIOS loads at offset 0x0100
 
 main:
@@ -58,8 +62,7 @@ main:
 	dw	flags_mult	; Table 19: FLAGS multipliers
 
 ; These values (BIOS ID string, BIOS date and so forth) go at the very top of memory
-
-biosstr	db	'8086tiny BIOS Revision 1.61!', 0, 0		; Why not?
+biosstr	db	'VirtualXT BIOS Revision 1.0', 0, 0, 0
 mem_top	db	0xea, 0, 0x01, 0, 0xf0, '03/08/14', 0, 0xfe, 0
 
 bios_entry:
@@ -359,15 +362,16 @@ next_out:
 
 	jmp	0:0x7c00
 
-; ************************* INT 7h handler - keyboard driver (8086tiny internal)
+; ************************* INT 7h handler - keyboard driver (VirtualXT internal)
 
 int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
-	; ASCII character of the keystroke is at 0040:this_keystroke
+	; Scancode is at 0040:this_keystroke and ASCII at 0040:this_keystroke_ascii
 
 	push	ds
 	push	es
 	push	ax
 	push	bx
+	push	cx
 	push	bp
 
 	push	cs
@@ -378,425 +382,106 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 
 	; Retrieve the keystroke
 
-	mov	ax, [es:this_keystroke-bios_data]
-	mov	byte [es:this_keystroke+1-bios_data], 0
-
-  real_key:
-
-	mov	byte [cs:last_key_sdl], 0
-
-	test	ah, 4 ; This key doesn't come from SDL
-	jz	check_linux_bksp
-
-	mov	byte [es:keyflags1-bios_data], 0
-	mov	byte [es:keyflags2-bios_data], 0
-
-	mov	byte [cs:last_key_sdl], 1 ; Key down from SDL
-
-	test	ah, 0x40 ; Key up
-	jz	sdl_check_specials
-
-	mov	byte [cs:last_key_sdl], 2 ; Key up from SDL
-
-  sdl_check_specials:
-
-	mov	bx, ax
-	and	bh, 7 ; If key is between 52F and 534 (Shift/Ctrl/Alt), ignore the key state flags
-	cmp	bx, 0x52f
-	je	sdl_just_press_shift
-	cmp	bx, 0x530
-	je	sdl_just_press_shift
-	cmp	bx, 0x533
-	je	sdl_just_press_alt
-	cmp	bx, 0x534
-	je	sdl_just_press_alt
-	cmp	bx, 0x531
-	je	sdl_just_press_ctrl
-	cmp	bx, 0x532
-	je	sdl_just_press_ctrl
-	jmp	sdl_check_alt
-
-  sdl_just_press_shift:
-
-	mov	al, 0x36 ; Shift
-	and	ah, 0x40 ; Key up?
-	add	al, ah
-	add	al, ah
-	call	io_key_available
-	jmp	i2_dne
-
-  sdl_just_press_alt:
-
-	mov	al, 0x38 ; Alt
-	and	ah, 0x40 ; Key up?
-	add	al, ah
-	add	al, ah
-	call	io_key_available
-	jmp	i2_dne
-
-  sdl_just_press_ctrl:
-
-	mov	al, 0x1d ; Ctrl
-	and	ah, 0x40 ; Key up?
-	add	al, ah
-	add	al, ah
-	call	io_key_available
-	jmp	i2_dne
-
-  sdl_check_alt:
-
-	test	ah, 8 ; Alt+something?
-	jz	sdl_no_alt
-	add	byte [es:keyflags1-bios_data], 8
-	add	byte [es:keyflags2-bios_data], 2
-
-  sdl_no_alt:
-
-	test	ah, 0x20 ; Ctrl+something?
-	jz	sdl_no_ctrl
-	add	byte [es:keyflags1-bios_data], 4
-
-  sdl_no_ctrl:
-
-	test	ah, 0x10 ; Shift+something?
-	jz	sdl_no_mods
-	add	byte [es:keyflags1-bios_data], 1
-
-  sdl_no_mods:
-
-	and	ah, 1 ; We have processed all SDL modifiers, so remove them
-
-	;cmp	ax, 160 ; Alt+Space?
-	;jne	next_sdl_alt_keys
-	;mov	al, ' '
-	;mov	byte [es:this_keystroke-bios_data], al
-
-  check_sdl_f_keys:
-
-	cmp	ax, 0x125
-	ja	i2_dne ; Unknown key
-
-	cmp	ax, 0x11a
-	jb	check_sdl_pgup_pgdn_keys
-
-	sub	ax, 0xdf ; F1 - F10
-	cmp	ax, 0x45
-	jb	check_sdl_f_keys2
-	add	ax, 0x12 ; F11 - F12
-
-  check_sdl_f_keys2:
-
-	mov	bh, al
-	mov	al, 0
-	jmp	sdl_scancode_xlat_done
-
-  check_sdl_pgup_pgdn_keys:
-
-	cmp	ax, 0x116
-	jb	check_sdl_cursor_keys
-	cmp	ax, 0x119
-	ja	check_sdl_cursor_keys
-
-	sub	ax, 0x116
-	mov	bx, pgup_pgdn_xlt
-	cs	xlat
-
-	mov	bh, al
-	mov	al, 0
-	jmp	sdl_scancode_xlat_done
-
-  check_sdl_cursor_keys:
-
-	cmp	ax, 0x111 ; SDL cursor keys
-	jb	sdl_process_key ; No special handling for other keys yet
-	
-	sub	ax, 0x111
-	mov	bx, unix_cursor_xlt
-	xlat	; Convert SDL cursor keys to scancode
-
-	mov	bh, al
-	mov	al, 0
-	mov	byte [es:this_keystroke-bios_data], 0
-	jmp	sdl_scancode_xlat_done
-
-  sdl_process_key:
-
-	cmp	ax, 0x100
-	jae	i2_dne ; Unsupported key
-	cmp	al, 0x7f ; SDL 0x7F backspace? Convert to 0x08
-	jne	sdl_process_key2
-	mov	al, 8
-
-  sdl_process_key2:
-
-	push	ax
-	mov	bx, a2scan_tbl ; ASCII to scancode table
-	xlat
-	mov	bh, al
-	pop	ax ; Scancode in BH, keycode in AL
-
-  sdl_scancode_xlat_done:
-
-	add	bh, 0x80 ; Key up scancode
-	cmp	byte [cs:last_key_sdl], 2 ; Key up?
-	je	sdl_not_in_buf
-
-	sub	bh, 0x80 ; Key down scancode
-
-  sdl_key_down:
-
-	mov	[es:this_keystroke-bios_data], al
-		
-  sdl_not_in_buf:
-
-	mov	al, bh
-	call	io_key_available
-	jmp	i2_dne	
-
-  check_linux_bksp:
-
-	cmp	al, 0 ; Null keystroke - ignore
-	je	i2_dne
-
-	cmp	al, 0x7f ; Linux code for backspace - change to 8
-	jne	after_check_bksp
-
-	mov	al, 8
-	mov	byte [es:this_keystroke-bios_data], 8
-
-  after_check_bksp:
-
-	cmp	byte [es:next_key_fn-bios_data], 1 ; If previous keypress was Ctrl+F (signifying this key is is Fxx), skip checks for Ctrl+A (Alt+xx) and Ctrl+F (Fxx)
-	je	i2_n
-
-	cmp	al, 0x01 ; Ctrl+A pressed - this is the sequence for "next key is Alt+"
-	jne	i2_not_alt
-
-	mov	byte [es:keyflags1-bios_data], 8 ; Alt flag down
-	mov	byte [es:keyflags2-bios_data], 2 ; Alt flag down
-	mov	al, 0x38 ; Simulated Alt by Ctrl+A prefix?
-	call	io_key_available
-
-	mov	byte [es:next_key_alt-bios_data], 1
-	jmp	i2_dne
-
-  i2_not_alt:
-
-	cmp	al, 0x06 ; Ctrl+F pressed - this is the sequence for "next key is Fxx"
-	jne	i2_not_fn
-
-	mov	byte [es:next_key_fn-bios_data], 1
-	jmp	i2_dne
-
-  i2_not_fn:
-
-	cmp	byte [es:notranslate_flg-bios_data], 1 ; If no translation mode is on, just pass through the scan code. ASCII key is zero.
-	mov	byte [es:notranslate_flg-bios_data], 0
-	jne	need_to_translate
-
-	mov	byte [es:this_keystroke-bios_data], 0
-	jmp	after_translate
-
-  need_to_translate:
-
-	cmp	al, 0xe0 ; Some OSes return scan codes after 0xE0 for things like cursor moves. So, if we find it, set a flag saying the next code received should not be translated.
-	mov	byte [es:notranslate_flg-bios_data], 1
-	je	i2_dne	; Don't add the 0xE0 to the keyboard buffer
-
-	mov	byte [es:notranslate_flg-bios_data], 0
-
-	cmp	al, 0x1b ; ESC key pressed. Either this a "real" escape, or it is UNIX cursor keys. In either case, we do nothing now, except set a flag
-	jne	i2_escnext
-
-	; If the last key pressed was ESC, then we need to stuff it
-	cmp	byte [es:escape_flag-bios_data], 1
-	jne	i2_sf
-
-	; Stuff an ESC character
-	
-	mov	byte [es:this_keystroke-bios_data], 0x1b
-
-	mov	al, 0x01
-	call	keypress_release
-
-  i2_sf:
-
-	mov	byte [es:escape_flag-bios_data], 1
-	jmp	i2_dne
-
-  i2_escnext:
-
-	; Check if the last key was an escape character
-	cmp	byte [es:escape_flag-bios_data], 1
-	jne	i2_noesc
-
-	; It is, so check if this key is a [ control character
-	cmp	al, '[' ; [ key pressed
-	je	i2_esc
-
-	; It isn't, so stuff an ESC character plus this key
-	
-	mov	byte [es:this_keystroke-bios_data], 0x1b
-
-	mov	al, 0x01
-	call	keypress_release
-
-	; Now actually process this key
-	mov	byte [es:escape_flag-bios_data], 0
 	mov	al, [es:this_keystroke-bios_data]
-	jmp	i2_noesc
+	mov	ch, al 				; Save scancode to CH
 
-  i2_esc:
+	and al, 0x7f 			; Remove key up bit
+	mov bl, al 				; Store masked scancode in BL
 
-	; Last + this characters are ESC ] - do nothing now, but set escape flag
-	mov	byte [es:escape_flag-bios_data], 2
-	jmp	i2_dne
+	mov al, ch
+	and	al, 0x80 			; Key up mask
+	xor al, 0x80 			; Flip to key down
+	mov cl, al 				; Store state mask in CL
 
-  i2_noesc:
+	cmp	bl, 0x2A 			; LShift?
+	je process_shift_key
+	cmp	bl, 0x36 			; RShift?
+	je process_shift_key
+	cmp	bl, 0x38 			; Alt?
+	je process_alt_key
+	cmp	bl, 0x1d 			; Ctrl?
+	je process_ctrl_key
+	cmp	bl, 0x3a 			; CapsLock?
+	je process_capslock_key
+	cmp	bl, 0x12 			; NumLock?
+	je process_numlock_key
 
-	cmp	byte [es:escape_flag-bios_data], 2
-	jne	i2_regular_key
+	jmp send_key_press
 
-	; No shifts or Alt for cursor keys
-	mov	byte [es:keyflags1-bios_data], 0
-	mov	byte [es:keyflags2-bios_data], 0
+  process_shift_key:
 
-	; Last + this characters are ESC ] xxx - cursor key, so translate and stuff it
-	sub	al, 'A'
-	mov	bx, unix_cursor_xlt
-	xlat
-
-	mov	byte [es:this_keystroke-bios_data], 0
-	jmp	after_translate
-	
-  i2_regular_key:
-
-	mov	byte [es:notranslate_flg-bios_data], 0
-
-	mov	bx, a2shift_tbl ; ASCII to shift code table
-	xlat
-
-	; Now, BL is 1 if shift is down, 0 otherwise. If shift is down, put a shift down scan code
-	; in port 0x60. Then call int 9. Otherwise, put a shift up scan code in, and call int 9.
-
-	push	ax
-
-	; Put shift flags in BIOS, 0040:0017. Add 8 to shift flags if Alt is down.
-	mov	ah, [es:next_key_alt-bios_data]
+	mov al, cl
 	cpu	186
-	shl	ah, 3
+	shr	al, 7
 	cpu	8086
-	add	al, ah
+	mov ah, al
 
-	cmp	byte [es:this_keystroke-bios_data], 0x1A ; Ctrl+A to Ctrl+Z? Then add Ctrl to BIOS key flags
-	ja	i2_no_ctrl
-	cmp	byte [es:this_keystroke-bios_data], 0
-	je	i2_no_ctrl
-	cmp	byte [es:this_keystroke-bios_data], 0xD ; CR
-	je	i2_no_ctrl
-	cmp	byte [es:this_keystroke-bios_data], 0xA ; LF
-	je	i2_no_ctrl
-	cmp	byte [es:this_keystroke-bios_data], 0x8 ; Backspace
-	je	i2_no_ctrl
-	cmp	byte [es:this_keystroke-bios_data], 0x9 ; Tab
-	je	i2_no_ctrl
-	add	al, 4 ; Ctrl in key flags
+	mov al, [es:keyflags1-bios_data]
+	and al, 0xFE
 
-	push	ax
-	mov	al, 0x1d ; Ctrl key down
-	call	io_key_available
-	pop	ax
+	jmp set_key_flag
 
-  i2_no_ctrl:
+  process_alt_key:
 
-	mov	[es:keyflags1-bios_data], al
-
+  	mov al, cl
 	cpu	186
-	shr	ah, 2
+	shr	al, 4
 	cpu	8086
-	mov	[es:keyflags2-bios_data], ah
+	mov ah, al
 
-	pop	ax
+	mov al, [es:keyflags1-bios_data]
+	and al, 0xF7
 
-	test	al, 1 ; Shift down?
-	jz	i2_n
+	jmp set_key_flag
 
-	mov	al, 0x36 ; Right shift down
-	call	io_key_available
+  process_ctrl_key:
 
-  i2_n:
+    mov al, cl
+	cpu	186
+	shr	al, 5
+	cpu	8086
+	mov ah, al
 
-	mov	al, [es:this_keystroke-bios_data]
+	mov al, [es:keyflags1-bios_data]
+	and al, 0xFB
 
-	mov	bx, a2scan_tbl ; ASCII to scan code table
-	xlat
+	jmp set_key_flag
 
-	cmp	byte [es:next_key_fn-bios_data], 1	; Fxx?
-	jne	after_translate
+  process_capslock_key:
 
-	cmp	byte [es:this_keystroke-bios_data], 1 ; Ctrl+F then Ctrl+A outputs code for Ctrl+A
-	je	after_translate
+    mov al, cl
+	cpu	186
+	shr	al, 1
+	cpu	8086
+	mov ah, al
 
-	cmp	byte [es:this_keystroke-bios_data], 6 ; Ctrl+F then Ctrl+F outputs code for Ctrl+F  
-	je	after_translate
-	
-	mov	byte [es:this_keystroke-bios_data], 0	; Fxx key, so zero out ASCII code
-	add	al, 0x39
+	mov al, [es:keyflags1-bios_data]
+	and al, 0xBF
 
-  after_translate:
+  process_numlock_key:
 
-	mov	byte [es:escape_flag-bios_data], 0
-	mov	byte [es:escape_flag_last-bios_data], 0
+    mov al, cl
+	cpu	186
+	shr	al, 2
+	cpu	8086
+	mov ah, al
 
-	; If the key is actually an Alt+ key we use an ASCII code of 0 instead of the real value.
+	mov al, [es:keyflags1-bios_data]
+	and al, 0xDF
 
-	cmp	byte [es:next_key_alt-bios_data], 1
-	jne	skip_ascii_zero
+  set_key_flag:
 
-	mov	byte [es:this_keystroke-bios_data], 0
+	or al, ah
+	mov [es:keyflags1-bios_data], al
 
-  skip_ascii_zero:
+  send_key_press:
 
-	; Output key down/key up event (scancode in AL) to keyboard port
-	call	keypress_release
+  	mov	al, ch 			; Restore scancode
 
-	; If scan code is not 0xE0, then also send right shift up if necessary
-	cmp	al, 0xe0
-	je	i2_dne
-
-	test	byte [es:keyflags1-bios_data], 1
-	jz	check_ctrl
-
-	mov	al, 0xb6 ; Right shift up
-	call	io_key_available
-
-  check_ctrl:
-
-	test	byte [es:keyflags1-bios_data], 4
-	jz	check_alt
-
-	mov	al, 0x9d ; Right Ctrl up
-	call	io_key_available
-
-  check_alt:
-
-	mov	al, byte [es:next_key_alt-bios_data]
-	mov	byte [es:next_key_alt-bios_data], 0
-	mov	byte [es:next_key_fn-bios_data], 0
-
-	cmp	al, 1
-	je	endalt
-
-	jmp	i2_dne
-
-  endalt:
-
-	mov	al, 0xb8 ; Left Alt up
-	call	io_key_available
-
-  i2_dne:
+	call io_key_available
 
 	pop	bp
+	pop	cx
 	pop	bx
 	pop	ax
 	pop	es
@@ -806,7 +491,6 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 ; ************************* INT 9h handler - keyboard (PC BIOS standard)
 
 int9:
-
 	push	es
 	push	ax
 	push	bx
@@ -816,7 +500,9 @@ int9:
 
 	cmp	al, 0x80 ; Key up?
 	jae	no_add_buf
-	cmp	al, 0x36 ; Shift?
+	cmp	al, 0x2A ; LShift?
+	je	no_add_buf
+	cmp	al, 0x36 ; RShift?
 	je	no_add_buf
 	cmp	al, 0x38 ; Alt?
 	je	no_add_buf
@@ -826,14 +512,13 @@ int9:
 	mov	bx, 0x40
 	mov	es, bx
 
-	mov	bh, al
-	mov	al, [es:this_keystroke-bios_data]
-
 	; Tail of the BIOS keyboard buffer goes in BP. This is where we add new keystrokes
 
+	mov	ah, [es:this_keystroke_ascii-bios_data]
+
 	mov	bp, [es:kbbuf_tail-bios_data]
-	mov	byte [es:bp], al ; ASCII code
-	mov	byte [es:bp+1], bh ; Scan code
+	mov	byte [es:bp], ah 					; ASCII code
+	mov	byte [es:bp+1], al 					; Scan code
 
 	; ESC keystroke is in the buffer now
 	add	word [es:kbbuf_tail-bios_data], 2
@@ -851,10 +536,10 @@ int9:
 
 	iret
 
-; ************************* INT Ah handler - timer (8086tiny internal)
+; ************************* INT Ah handler - timer (VirtualXT internal)
 
 inta:
-	; 8086tiny called interrupt 0xA frequently, at a rate dependent on the speed of your computer.
+	; VirtualXT called interrupt 0xA frequently, at a rate dependent on the speed of your computer.
 	; This interrupt handler scales down the call rate and calls INT 8 at 18.2 times per second,
 	; as per a real PC.
 
@@ -931,54 +616,6 @@ inta_call_int8:
 
 	mov	ax, [cs:tm_msec]
 	mov	[cs:last_int8_msec], ax
-
-skip_timer_increment:
-
-	; If last key was from SDL, don't simulate key up events (SDL will do it for us)
-	cmp	byte [cs:last_key_sdl], 0
-	jne	i8_end
-
-	; See if we have any keys down. If so, release them
-	cmp	byte [es:key_now_down-bios_data], 0
-	je	i8_no_key_down
-
-	mov	al, [es:key_now_down-bios_data]
-	mov	byte [es:key_now_down-bios_data], 0
-	add	al, 0x80
-	call	io_key_available
-
-  i8_no_key_down:
-
-	; See if we have a waiting ESC flag
-	cmp	byte [es:escape_flag-bios_data], 1
-	jne	i8_end
-	
-	; Did we have one last two cycles as well?
-	cmp	byte [es:escape_flag_last-bios_data], 1
-	je	i8_stuff_esc
-
-	inc	byte [es:escape_flag_last-bios_data]
-	jmp	i8_end
-
-i8_stuff_esc:
-
-	; Yes, clear the ESC flag and put it in the keyboard buffer
-	mov	byte [es:escape_flag-bios_data], 0
-	mov	byte [es:escape_flag_last-bios_data], 0
-
-	; mov	bp, [es:kbbuf_tail-bios_data]
-	; mov	byte [es:bp], 0x1b ; ESC ASCII code
-	; mov	byte [es:bp+1], 0x01 ; ESC scan code
-
-	; ESC keystroke is in the buffer now
-	; add	word [es:kbbuf_tail-bios_data], 2
-	; call	kb_adjust_buf ; Wrap the tail around the head if the buffer gets too large
-
-	mov	byte [es:this_keystroke-bios_data], 0x1b
-
-	; Push out ESC keypress/release
-	mov	al, 0x01
-	call	keypress_release
 
 i8_end:	
 
@@ -3123,32 +2760,6 @@ clear_screen:
 
 	ret
 
-; Pushes a key press, followed by a key release, event to I/O port 0x60 and calls
-; INT 9.
-
-keypress_release:
-
-	push	ax
-
-	cmp	byte [es:key_now_down-bios_data], 0
-	je	kpr_no_prev_release
-
-	mov	al, [es:key_now_down-bios_data]
-	add	al, 0x80
-	call	io_key_available
-
-	pop	ax
-	push	ax
-
-  kpr_no_prev_release:
-
-	mov	[es:key_now_down-bios_data], al
-	call	io_key_available
-
-	pop	ax
-
-	ret
-
 ; Sets key available flag on I/O port 0x64, outputs key scan code in AL to I/O port 0x60, and calls INT 9
 
 io_key_available:
@@ -3687,25 +3298,20 @@ kb_led		db	0
 boot_device	db	0
 crt_curpos_x	db	0
 crt_curpos_y	db	0
-key_now_down	db	0
-next_key_fn	db	0
+		db	0
+		db	0
 cursor_visible	db	1
-escape_flag_last	db	0
-next_key_alt	db	0
-escape_flag	db	0
-notranslate_flg	db	0
+		db	0
+		db	0
+		db	0
+		db	0
 this_keystroke	db	0
-this_keystroke_ext		db	0
+this_keystroke_ascii		db	0
 timer0_freq	dw	0xffff ; PIT channel 0 (55ms)
 timer2_freq	dw	0      ; PIT channel 2
 cga_vmode	db	0
 vmem_offset	dw	0      ; Video RAM offset
 ending:		times (0xff-($-com1addr)) db	0
-
-; Keyboard scan code tables
-
-a2scan_tbl      db	0xFF, 0x1E, 0x30, 0x2E, 0x20, 0x12, 0x21, 0x22, 0x0E, 0x0F, 0x24, 0x25, 0x26, 0x1C, 0x31, 0x18, 0x19, 0x10, 0x13, 0x1F, 0x14, 0x16, 0x2F, 0x11, 0x2D, 0x15, 0x2C, 0x01, 0x00, 0x00, 0x00, 0x00, 0x39, 0x02, 0x28, 0x04, 0x05, 0x06, 0x08, 0x28, 0x0A, 0x0B, 0x09, 0x0D, 0x33, 0x0C, 0x34, 0x35, 0x0B, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x27, 0x27, 0x33, 0x0D, 0x34, 0x35, 0x03, 0x1E, 0x30, 0x2E, 0x20, 0x12, 0x21, 0x22, 0x23, 0x17, 0x24, 0x25, 0x26, 0x32, 0x31, 0x18, 0x19, 0x10, 0x13, 0x1F, 0x14, 0x16, 0x2F, 0x11, 0x2D, 0x15, 0x2C, 0x1A, 0x2B, 0x1B, 0x07, 0x0C, 0x29, 0x1E, 0x30, 0x2E, 0x20, 0x12, 0x21, 0x22, 0x23, 0x17, 0x24, 0x25, 0x26, 0x32, 0x31, 0x18, 0x19, 0x10, 0x13, 0x1F, 0x14, 0x16, 0x2F, 0x11, 0x2D, 0x15, 0x2C, 0x1A, 0x2B, 0x1B, 0x29, 0x0E
-a2shift_tbl     db	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0
 
 ; Interrupt vector table - to copy to 0:0
 
@@ -3781,14 +3387,6 @@ colour_table	db	30, 34, 32, 36, 31, 35, 33, 37
 
 low_ascii_conv	db	' ', 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, '><|!|$', 250, '|^v><--^v'
 
-; Conversion from UNIX cursor keys/SDL keycodes to scancodes
-
-unix_cursor_xlt	db	0x48, 0x50, 0x4d, 0x4b
-
-; Conversion from SDL keycodes to Home/End/PgUp/PgDn scancodes
-
-pgup_pgdn_xlt	db	0x47, 0x4f, 0x49, 0x51
-
 ; Internal variables for VMEM driver
 
 int8_ctr	db	0
@@ -3803,7 +3401,6 @@ crt_curpos_y_last	db	0
 ; INT 8 millisecond counter
 
 last_int8_msec	dw	0
-last_key_sdl	db 	0
 
 ; Now follow the tables for instruction decode helping
 

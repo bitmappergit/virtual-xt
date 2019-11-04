@@ -9,7 +9,7 @@ function create_project(k)
     language 'C'
     targetdir ''
     platforms { 'native', 'x32', 'x64' }
-    includedirs { 'src' }
+    includedirs { 'include' }
 
     if wall then flags { 'ExtraWarnings'} end
 
@@ -22,7 +22,7 @@ function create_project(k)
             links { 'SDL2' }
         end
     else
-        files { 'src/libvxt.c' }
+        files { 'src/vxt.c' }
         targetname 'vxt'
     end
 end

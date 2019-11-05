@@ -19,7 +19,7 @@ function create_project(k)
         if nosdl then
             defines { 'NO_SDL' }
         else
-            links { 'SDL2' }
+            links { 'SDL2', 'comdlg32' }
         end
     else
         files { 'src/vxt.c' }

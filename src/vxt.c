@@ -83,7 +83,7 @@ typedef unsigned char byte;
 typedef unsigned short word;
 
 struct vxt_emulator {
-	byte mem[RAM_SIZE], io_ports[IO_PORT_COUNT], bios_table_lookup[20][256];
+	byte mem[RAM_SIZE], io_ports[IO_PORT_COUNT];
 	byte *opcode_stream, *regs8, *vid_mem_base;
 	byte i_rm, i_w, i_reg, i_mod, i_mod_size, i_d, i_reg4bit, raw_opcode_id, xlat_opcode_id, extra, rep_mode, seg_override_en, rep_override_en, trap_flag, int8_asap, scratch_uchar, io_hi_lo, spkr_en;
 	word vid_addr_lookup[VIDEO_RAM_SIZE], *regs16, reg_ip, seg_override, file_index, wave_counter;
@@ -107,11 +107,61 @@ struct vxt_emulator {
 
 const word cga_colors[4] = {0 /* Black */, 0x1F1F /* Cyan */, 0xE3E3 /* Magenta */, 0xFFFF /* White */};
 
+// R/M mode tables
+const byte rm_mode0_reg1[]		= {3, 3, 5, 5, 6, 7, 12, 3};
+const byte rm_mode012_reg2[]	= {6, 7, 6, 7, 12, 12, 12, 12};
+const byte rm_mode0_disp[]		= {0, 0, 0, 0, 0, 0, 1, 0};
+const byte rm_mode0_dfseg[]		= {11, 11, 10, 10, 11, 11, 11, 11};
+
+const byte rm_mode12_reg1[]		= {3, 3, 5, 5, 6, 7, 5, 3};
+const byte rm_mode12_disp[]		= {1, 1, 1, 1, 1, 1, 1, 1};
+const byte rm_mode12_dfseg[]	= {11, 11, 10, 10, 11, 11, 10, 11};
+
+// Opcode decode tables
+const byte xlat_ids[]		= {9, 9, 9, 9, 7, 7, 25, 26, 9, 9, 9, 9, 7, 7, 25, 48, 9, 9, 9, 9, 7, 7, 25, 26, 9, 9, 9, 9, 7, 7, 25, 26, 9, 9, 9, 9, 7, 7, 27, 28, 9, 9, 9, 9, 7, 7, 27, 28, 9, 9, 9, 9, 7, 7, 27, 29, 9, 9, 9, 9, 7, 7, 27, 29, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 51, 54, 52, 52, 52, 52, 52, 52, 55, 55, 55, 55, 52, 52, 52, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 15, 15, 24, 24, 9, 9, 9, 9, 10, 10, 10, 10, 16, 16, 16, 16, 16, 16, 16, 16, 30, 31, 32, 53, 33, 34, 35, 36, 11, 11, 11, 11, 17, 17, 18, 18, 47, 47, 17, 17, 17, 17, 18, 18, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 12, 12, 19, 19, 37, 37, 20, 20, 49, 50, 19, 19, 38, 39, 40, 19, 12, 12, 12, 12, 41, 42, 43, 44, 53, 53, 53, 53, 53, 53, 53, 53, 13, 13, 13, 13, 21, 21, 22, 22, 14, 14, 14, 14, 21, 21, 22, 22, 53, 0, 23, 23, 53, 45, 6, 6, 46, 46, 46, 46, 46, 46, 5, 5};
+const byte ex_data[]		= {0, 0, 0, 0, 0, 0, 8, 8, 1, 1, 1, 1, 1, 1, 9, 36, 2, 2, 2, 2, 2, 2, 10, 10, 3, 3, 3, 3, 3, 3, 11, 11, 4, 4, 4, 4, 4, 4, 8, 0, 5, 5, 5, 5, 5, 5, 9, 1, 6, 6, 6, 6, 6, 6, 10, 2, 7, 7, 7, 7, 7, 7, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 21, 21, 21, 21, 21, 0, 0, 0, 0, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 0, 0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 12, 12, 12, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 16, 22, 0, 0, 0, 0, 1, 1, 0, 255, 48, 2, 0, 0, 0, 0, 255, 255, 40, 11, 3, 3, 3, 3, 3, 3, 3, 3, 43, 43, 43, 43, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 21, 0, 0, 2, 40, 21, 21, 80, 81, 92, 93, 94, 95, 0, 0};
+const byte std_flags[]		= {3, 3, 3, 3, 3, 3, 0, 0, 5, 5, 5, 5, 5, 5, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 5, 5, 5, 5, 5, 5, 0, 1, 3, 3, 3, 3, 3, 3, 0, 1, 5, 5, 5, 5, 5, 5, 0, 1, 3, 3, 3, 3, 3, 3, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+const byte base_size[]		= {2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 0, 0, 2, 2, 2, 2, 4, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 2, 2};
+const byte i_w_adder[]		= {0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+const byte i_mod_adder[] 	= {1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1};
+
+const byte flags_mult[] = {0, 2, 4, 6, 7, 8, 9, 10, 11};
+
+const byte jxx_dec_a[] = {48, 40, 43, 40, 44, 41, 49, 49};
+const byte jxx_dec_b[] = {49, 49, 49, 43, 49, 49, 49, 43};
+const byte jxx_dec_c[] = {49, 49, 49, 49, 49, 49, 44, 44};
+const byte jxx_dec_d[] = {49, 49, 49, 49, 49, 49, 48, 48};
+
+const byte parity[256] = {1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1};
+
+const byte* const decode_lookup[20] = {
+	rm_mode12_reg1, 	// Table 0: R/M mode 1/2 "register 1" lookup
+	rm_mode012_reg2, 	// Table 1: R/M mode 1/2 "register 2" lookup
+	rm_mode12_disp, 	// Table 2: R/M mode 1/2 "DISP multiplier" lookup
+	rm_mode12_dfseg, 	// Table 3: R/M mode 1/2 "default segment" lookup
+	rm_mode0_reg1, 		// Table 4: R/M mode 0 "register 1" lookup
+	rm_mode012_reg2, 	// Table 5: R/M mode 0 "register 2" lookup
+	rm_mode0_disp, 		// Table 6: R/M mode 0 "DISP multiplier" lookup
+	rm_mode0_dfseg, 	// Table 7: R/M mode 0 "default segment" lookup
+	xlat_ids, 			// Table 8: Translation of raw opcode index ("Raw ID") to function number ("Xlat'd ID")
+	ex_data, 			// Table 9: Translation of Raw ID to Extra Data
+	std_flags, 			// Table 10: How each Raw ID sets the flags (bit 1 = sets SZP, bit 2 = sets AF/OF for arithmetic, bit 3 = sets OF/CF for logic)
+	parity, 			// Table 11: Parity flag loop-up table (256 entries)
+	base_size, 			// Table 12: Translation of Raw ID to base instruction size (bytes)
+	i_w_adder, 			// Table 13: Translation of Raw ID to i_w size adder yes/no
+	i_mod_adder, 		// Table 14: Translation of Raw ID to i_mod size adder yes/no
+	jxx_dec_a, 			// Table 15: Jxx decode table A
+	jxx_dec_b, 			// Table 16: Jxx decode table B
+	jxx_dec_c, 			// Table 17: Jxx decode table C
+	jxx_dec_d, 			// Table 18: Jxx decode table D
+	flags_mult 			// Table 19: FLAGS multipliers
+};
+
 // Helper macros
 
 // Decode mod, r_m and reg fields in instruction
 #define DECODE_RM_REG e->scratch2_uint = 4 * !e->i_mod, \
-					  e->op_to_addr = e->rm_addr = e->i_mod < 3 ? SEGREG(e->seg_override_en ? e->seg_override : e->bios_table_lookup[e->scratch2_uint + 3][e->i_rm], e->bios_table_lookup[e->scratch2_uint][e->i_rm], e->regs16[e->bios_table_lookup[e->scratch2_uint + 1][e->i_rm]] + e->bios_table_lookup[e->scratch2_uint + 2][e->i_rm] * e->i_data1+) : GET_REG_ADDR(e->i_rm), \
+					  e->op_to_addr = e->rm_addr = e->i_mod < 3 ? SEGREG(e->seg_override_en ? e->seg_override : decode_lookup[e->scratch2_uint + 3][e->i_rm], decode_lookup[e->scratch2_uint][e->i_rm], e->regs16[decode_lookup[e->scratch2_uint + 1][e->i_rm]] + decode_lookup[e->scratch2_uint + 2][e->i_rm] * e->i_data1+) : GET_REG_ADDR(e->i_rm), \
 					  e->op_from_addr = GET_REG_ADDR(e->i_reg), \
 					  e->i_d && (e->scratch_uint = e->op_from_addr, e->op_from_addr = e->rm_addr, e->op_to_addr = e->scratch_uint)
 
@@ -194,24 +244,24 @@ static void make_flags(vxt_emulator_t *e)
 {
 	e->scratch_uint = 0xF002; // 8086 has reserved and unused flags set to 1
 	for (int i = 9; i--;)
-		e->scratch_uint += e->regs8[FLAG_CF + i] << e->bios_table_lookup[TABLE_FLAGS_BITFIELDS][i];
+		e->scratch_uint += e->regs8[FLAG_CF + i] << decode_lookup[TABLE_FLAGS_BITFIELDS][i];
 }
 
 // Set emulated CPU FLAGS register from regs8[FLAG_xx] values
 static void set_flags(vxt_emulator_t *e, int new_flags)
 {
 	for (int i = 9; i--;)
-		e->regs8[FLAG_CF + i] = !!(1 << e->bios_table_lookup[TABLE_FLAGS_BITFIELDS][i] & new_flags);
+		e->regs8[FLAG_CF + i] = !!(1 << decode_lookup[TABLE_FLAGS_BITFIELDS][i] & new_flags);
 }
 
 // Convert raw opcode to translated opcode index. This condenses a large number of different encodings of similar
 // instructions into a much smaller number of distinct functions, which we then execute
 static void set_opcode(vxt_emulator_t *e, unsigned char opcode)
 {
-	e->xlat_opcode_id = e->bios_table_lookup[TABLE_XLAT_OPCODE][e->raw_opcode_id = opcode];
-	e->extra = e->bios_table_lookup[TABLE_XLAT_SUBFUNCTION][opcode];
-	e->i_mod_size = e->bios_table_lookup[TABLE_I_MOD_SIZE][opcode];
-	e->set_flags_type = e->bios_table_lookup[TABLE_STD_FLAGS][opcode];
+	e->xlat_opcode_id = decode_lookup[TABLE_XLAT_OPCODE][e->raw_opcode_id = opcode];
+	e->extra = decode_lookup[TABLE_XLAT_SUBFUNCTION][opcode];
+	e->i_mod_size = decode_lookup[TABLE_I_MOD_SIZE][opcode];
+	e->set_flags_type = decode_lookup[TABLE_STD_FLAGS][opcode];
 }
 
 // Execute INT #interrupt_num on the emulated machine
@@ -264,11 +314,6 @@ void vxt_load_bios(vxt_emulator_t *e, const void *data, size_t sz)
 {
 	// Load BIOS image into F000:0100, and set IP to 0100
 	memcpy(e->regs8 + (e->reg_ip = 0x100), data, sz < 0xFF00 ? sz : 0xFF00);
-
-	// Load instruction decoding helper table
-	for (int i = 0; i < 20; i++)
-		for (int j = 0; j < 256; j++)
-			e->bios_table_lookup[i][j] = e->regs8[e->regs16[0x81 + i] + j];
 }
 
 void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd) {
@@ -344,7 +389,7 @@ int vxt_step(vxt_emulator_t *e)
 			OPCODE_CHAIN 0: // Conditional jump (JAE, JNAE, etc.)
 				// i_w is the invert flag, e.g. i_w == 1 means JNAE, whereas i_w == 0 means JAE 
 				e->scratch_uchar = e->raw_opcode_id / 2 & 7;
-				e->reg_ip += (char)e->i_data0 * (e->i_w ^ (e->regs8[e->bios_table_lookup[TABLE_COND_JUMP_DECODE_A][e->scratch_uchar]] || e->regs8[e->bios_table_lookup[TABLE_COND_JUMP_DECODE_B][e->scratch_uchar]] || e->regs8[e->bios_table_lookup[TABLE_COND_JUMP_DECODE_C][e->scratch_uchar]] ^ e->regs8[e->bios_table_lookup[TABLE_COND_JUMP_DECODE_D][e->scratch_uchar]]))
+				e->reg_ip += (char)e->i_data0 * (e->i_w ^ (e->regs8[decode_lookup[TABLE_COND_JUMP_DECODE_A][e->scratch_uchar]] || e->regs8[decode_lookup[TABLE_COND_JUMP_DECODE_B][e->scratch_uchar]] || e->regs8[decode_lookup[TABLE_COND_JUMP_DECODE_C][e->scratch_uchar]] ^ e->regs8[decode_lookup[TABLE_COND_JUMP_DECODE_D][e->scratch_uchar]]))
 			OPCODE 1: // MOV reg, imm
 				e->i_w = !!(e->raw_opcode_id & 8);
 				R_M_OP(e->mem[GET_REG_ADDR(e->i_reg4bit)], =, e->i_data0)
@@ -708,14 +753,14 @@ int vxt_step(vxt_emulator_t *e)
 
 		// Increment instruction pointer by computed instruction length. Tables in the BIOS binary
 		// help us here.
-		e->reg_ip += (e->i_mod*(e->i_mod != 3) + 2*(!e->i_mod && e->i_rm == 6))*e->i_mod_size + e->bios_table_lookup[TABLE_BASE_INST_SIZE][e->raw_opcode_id] + e->bios_table_lookup[TABLE_I_W_SIZE][e->raw_opcode_id]*(e->i_w + 1);
+		e->reg_ip += (e->i_mod*(e->i_mod != 3) + 2*(!e->i_mod && e->i_rm == 6))*e->i_mod_size + decode_lookup[TABLE_BASE_INST_SIZE][e->raw_opcode_id] + decode_lookup[TABLE_I_W_SIZE][e->raw_opcode_id]*(e->i_w + 1);
 
 		// If instruction needs to update SF, ZF and PF, set them as appropriate
 		if (e->set_flags_type & FLAGS_UPDATE_SZP)
 		{
 			e->regs8[FLAG_SF] = SIGN_OF(e->op_result);
 			e->regs8[FLAG_ZF] = !e->op_result;
-			e->regs8[FLAG_PF] = e->bios_table_lookup[TABLE_PARITY_FLAG][(unsigned char)e->op_result];
+			e->regs8[FLAG_PF] = decode_lookup[TABLE_PARITY_FLAG][(unsigned char)e->op_result];
 
 			// If instruction is an arithmetic or logic operation, also set AF/OF/CF as appropriate.
 			if (e->set_flags_type & FLAGS_UPDATE_AO_ARITH)

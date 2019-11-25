@@ -28,8 +28,12 @@
 	db	0x0f, 0x03
 %endmacro
 
-%macro	extended_debug 0
+%macro	extended_serial_com 0
 	db	0x0f, 0x04
+%endmacro
+
+%macro	extended_debug 0
+	db	0x0f, 0x05
 %endmacro
 
 org	100h				; BIOS loads at offset 0x0100
@@ -2024,14 +2028,8 @@ wr_fine:
 ; ************************* INT 14h - serial port functions
 
 int14:
-	cmp	ah, 0
-	je	int14_init
 
-	jmp	reach_stack_stc
-
-  int14_init:
-
-	mov	ax, 0
+	extended_serial_com
 	jmp	reach_stack_stc
 
 ; ************************* INT 15h - get system configuration
@@ -3220,7 +3218,7 @@ ansi_hide_cursor:
 
 bios_data:
 
-com1addr	dw	0
+com1addr	dw	0x3F8
 com2addr	dw	0
 com3addr	dw	0
 com4addr	dw	0
@@ -3228,8 +3226,8 @@ lpt1addr	dw	0
 lpt2addr	dw	0
 lpt3addr	dw	0
 lpt4addr	dw	0
-equip		dw	0b0000000000100001
-;equip		dw	0b0000000100100001
+equip		dw	0b0000001000100001 		; With COM1
+;equip		dw	0b0000000000100001
 		db	0
 memsize		dw	0x280
 		db	0

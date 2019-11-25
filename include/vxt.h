@@ -4,8 +4,8 @@
 //
 // This work is licensed under the MIT License. See included LICENSE file.
 
-#ifndef _LIBVXT_H_
-#define _LIBVXT_H_
+#ifndef _VXT_H_
+#define _VXT_H_
 
 #include <stddef.h>
 #include <time.h>
@@ -18,6 +18,52 @@ extern "C" {
 #ifndef VXT_GRAPHICS_UPDATE_DELAY
     #define VXT_GRAPHICS_UPDATE_DELAY 360000
 #endif
+
+// Modem control
+#define VXT_SERIAL_MODEM_DATA_TERMINAL_READY            0x1
+#define VXT_SERIAL_MODEM_REQUEST_TO_SEND                0x2
+#define VXT_SERIAL_MODEM_AUX_OUTPUT_1                   0x4
+#define VXT_SERIAL_MODEM_AUX_OUTPUT_2                   0x8
+#define VXT_SERIAL_MODEM_LOOPBACK_MODE                  0x10
+#define VXT_SERIAL_MODEM_AUTOFLOW_CONTROL               0x20
+
+// Modem status
+#define VXT_SERIAL_MODEM_DELTA_CLEAR_TO_SEND            0x1
+#define VXT_SERIAL_MODEM_DELTA_DATA_SET_READY           0x2
+#define VXT_SERIAL_MODEM_TRAILING_EDGE_RING_INDICATOR   0x4
+#define VXT_SERIAL_MODEM_DELTA_DATA_CARRIER_DETECTED    0x8
+#define VXT_SERIAL_MODEM_CLEAR_TO_SEND                  0x10
+#define VXT_SERIAL_MODEM_DATA_SET_READY                 0x20
+#define VXT_SERIAL_MODEM_RING_INDICATOR                 0x40
+#define VXT_SERIAL_MODEM_RECEIVED_LINE_SIGNAL_DETECT    0x80
+
+// Line status
+#define VXT_SERIAL_LINE_DATA_READY                      0x1
+#define VXT_SERIAL_LINE_OVERRUN_ERROR                   0x2
+#define VXT_SERIAL_LINE_PARITY_ERROR                    0x4
+#define VXT_SERIAL_LINE_FRAMING_ERROR                   0x8
+#define VXT_SERIAL_LINE_BREAK_DETECT                    0x10
+#define VXT_SERIAL_LINE_TRANS_HOLDING_REG_EMPTY         0x20
+#define VXT_SERIAL_LINE_TRANS_SHIFT_REG_EMPTY           0x40
+#define VXT_SERIAL_LINE_TIME_OUT_ERROR                  0x80
+
+// Serial port base addresses
+#define VXT_SERIAL_COM1_BASE 0x3F8
+#define VXT_SERIAL_COM2_BASE 0x2F8
+#define VXT_SERIAL_COM3_BASE 0x3E8
+#define VXT_SERIAL_COM4_BASE 0x2E8
+
+// Serial port IO offsets
+#define VXT_SERIAL_DATA 0
+#define VXT_SERIAL_DLAB_LOW 0
+#define VXT_SERIAL_INTERRUPT_ENABLE 1
+#define VXT_SERIAL_DLAB_HIGH 1
+#define VXT_SERIAL_FIFO_CONTROL 2
+#define VXT_SERIAL_LINE_CONTROL 3
+#define VXT_SERIAL_MODEM_CONTROL 4
+#define VXT_SERIAL_LINE_STATUS 5
+#define VXT_SERIAL_MODEM_STATUS 6
+#define VXT_SERIAL_SCRATCH 7
 
 #define VXT_MASK_KEY_UP 0x80
 
@@ -234,10 +280,24 @@ typedef struct {
 typedef struct {
     void *userdata;
 
-    int (*filter)(void*,unsigned short, int);
+    int (*filter)(void*,unsigned short,int);
     unsigned char (*in)(void*,unsigned short);
-    void (*out)(void*,unsigned short, unsigned char);
+    void (*out)(void*,unsigned short,unsigned char);
 } vxt_port_map_t;
+
+typedef struct {
+    unsigned char modem;
+    unsigned char line;
+} vxt_serial_status_t;
+
+typedef struct {
+    void *userdata;
+
+    void (*init)(void*,int);
+    vxt_serial_status_t (*status)(void*);
+    void (*send)(void*,unsigned char);
+    unsigned char (*receive)(void*);
+} vxt_serial_t;
 
 typedef struct {
     void *userdata;
@@ -255,6 +315,7 @@ extern void vxt_replace_floppy(vxt_emulator_t *e, vxt_drive_t *fd);
 extern void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd);
 extern void vxt_set_video(vxt_emulator_t *e, vxt_video_t *video);
 extern void vxt_set_port_map(vxt_emulator_t *e, vxt_port_map_t *map);
+extern void vxt_set_serial(vxt_emulator_t *e, int port, vxt_serial_t *com);
 extern void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac);
 extern void vxt_set_audio_silence(vxt_emulator_t *e, unsigned char s);
 extern int vxt_step(vxt_emulator_t *e);

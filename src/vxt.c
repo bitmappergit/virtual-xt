@@ -21,24 +21,6 @@
 // Timer/keyboard update delays (explained later)
 #define KEYBOARD_TIMER_UPDATE_DELAY 20000
 
-// Serial port addresses
-#define COM1_BASE 0x3F8
-#define COM2_BASE 0x2F8
-#define COM3_BASE 0x3E8
-#define COM4_BASE 0x2E8
-
-// Serial port IO offsets
-#define SERIAL_DATA 0
-#define SERIAL_DLAB_LOW 0
-#define SERIAL_INTERRUPT_ENABLE 1
-#define SERIAL_DLAB_HIGH 1
-#define SERIAL_FIFO_CONTROL 2
-#define SERIAL_LINE_CONTROL 3
-#define SERIAL_MODEM_CONTROL 4
-#define SERIAL_LINE_STATUS 5
-#define SERIAL_MODEM_STATUS 6
-#define SERIAL_SCRATCH 7
-
 // 16-bit register decodes
 #define REG_AX 0
 #define REG_CX 1
@@ -113,6 +95,7 @@ struct vxt_emulator {
 	vxt_video_t *video;
 	void *window;
 	
+	vxt_serial_t *serial[4];
 	vxt_drive_t *disk[2];
 	vxt_clock_t *clock;
 
@@ -306,6 +289,7 @@ void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac) { e->pause_a
 void vxt_set_audio_silence(vxt_emulator_t *e, unsigned char s) { e->audio_silence = s; }
 void vxt_set_video(vxt_emulator_t *e, vxt_video_t *video) { e->video = video; }
 void vxt_set_port_map(vxt_emulator_t *e, vxt_port_map_t *map) { e->port_map = map; }
+void vxt_set_serial(vxt_emulator_t *e, int port, vxt_serial_t *com) { e->serial[port-1] = com; }
 void vxt_close(vxt_emulator_t *e) { if (e->mem_block) free(e->mem_block); }
 size_t vxt_memory_required() { return sizeof(vxt_emulator_t); }
 
@@ -612,7 +596,7 @@ int vxt_step(vxt_emulator_t *e)
 				e->scratch_uint == 0x3D5 && (e->io_ports[0x3D4] >> 1 == 7) && (e->scratch2_uint = ((e->mem[0x49E]*80 + e->mem[0x49D] + CAST(short)e->mem[0x4AD]) & (e->io_ports[0x3D4] & 1 ? 0xFF00 : 0xFF)) + (e->regs8[REG_AL] << (e->io_ports[0x3D4] & 1 ? 0 : 8)) - CAST(short)e->mem[0x4AD], e->mem[0x49D] = e->scratch2_uint % 80, e->mem[0x49E] = e->scratch2_uint / 80); // CRT cursor position
 				e->scratch_uint == 0x3B5 && e->io_ports[0x3B4] == 1 && (e->GRAPHICS_X = e->regs8[REG_AL] * 16); // Hercules resolution reprogramming. Defaults are set in the BIOS
 				e->scratch_uint == 0x3B5 && e->io_ports[0x3B4] == 6 && (e->GRAPHICS_Y = e->regs8[REG_AL] * 4);
-				e->port_map && e->port_map->filter(e->port_map->userdata, e->scratch_uint, 1) && (e->port_map->out(e->port_map->userdata, e->scratch_uint, e->regs8[REG_AL]), 0);				
+				e->port_map && e->port_map->filter(e->port_map->userdata, e->scratch_uint, 1) && (e->port_map->out(e->port_map->userdata, e->scratch_uint, e->regs8[REG_AL]), 0);
 			OPCODE 23: // REPxx
 				e->rep_override_en = 2;
 				e->rep_mode = e->i_w;
@@ -700,7 +684,18 @@ int vxt_step(vxt_emulator_t *e)
 								? ((char)e->i_data0 == 3 ? (int(*)())scratch_disk->write : (int(*)())scratch_disk->read)(scratch_disk->userdata, e->mem + SEGREG(REG_ES, REG_BX,), e->regs16[REG_AX])
 								: 0;
 						} else e->regs8[REG_AL] = 0;
-					OPCODE 4: // DEBUG
+					OPCODE 4: // SERIAL_COM
+						{
+							vxt_serial_t *com = e->serial[e->regs16[REG_DX]];
+							if (!com) e->regs16[REG_AX] = 0;
+							else switch (e->regs8[REG_AH]) {
+								case 0: com->init(com->userdata, e->regs8[REG_AL]); // Fallthrough to status.
+								case 3: e->regs8[REG_AL] = com->status(com->userdata).modem; e->regs8[REG_AH] = com->status(com->userdata).line; break;
+								case 1: com->send(com->userdata, e->regs8[REG_AL]); e->regs8[REG_AH] = com->status(com->userdata).line; break;
+								case 2: e->regs8[REG_AL] = com->receive(com->userdata); e->regs8[REG_AH] = com->status(com->userdata).line; break;
+							}
+						}
+					OPCODE 5: // DEBUG
 						printf(
 							"\nAX: 0x%X (0x%X,0x%X),\tBX: 0x%X (0x%X,0x%X)\nCX: 0x%X (0x%X,0x%X),\tDX: 0x%X (0x%X,0x%X)\n",
 							e->regs16[REG_AX], e->regs8[REG_AL], e->regs8[REG_AH],

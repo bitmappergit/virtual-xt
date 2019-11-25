@@ -4,7 +4,6 @@
 // This work is licensed under the MIT License. See included LICENSE file.
 
 #include "vxt.h"
-#include "kb.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -65,7 +64,12 @@ insert:
 	vxt_replace_floppy(e, &fd);
 }
 
+// Keyboard helpers.
+#include "kb.h"
+
 #ifndef _WIN32
+	#error Not supported!
+
 	#include <fcntl.h>
 	
 	unsigned char unix_key = 0;
@@ -95,12 +99,22 @@ char bios_buff[0xFFFF];
 #endif
 
 SDL_Surface *sdl_surface = 0;
+SDL_Texture *sdl_texture = 0;
+SDL_Renderer *sdl_renderer = 0;
 SDL_AudioSpec sdl_audio = {44100, AUDIO_U8, 1, 0, 128};
 
 static void *open_window(void *ud, vxt_mode_t m, int x, int y)
 {
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+
 	SDL_Init(SDL_INIT_VIDEO);
-	sdl_window = SDL_CreateWindow(m == VXT_CGA ? "VirtualXT (CGA)" : "VirtualXT (Hercules)", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, x, y, SDL_WINDOW_INPUT_FOCUS|SDL_WINDOW_MOUSE_FOCUS);
+	int h = (int)((float)x / (4.f / 3.f));
+	SDL_CreateWindowAndRenderer(x, h, SDL_WINDOW_RESIZABLE|SDL_WINDOW_INPUT_FOCUS|SDL_WINDOW_MOUSE_FOCUS, &sdl_window, &sdl_renderer);
+	SDL_SetWindowTitle(sdl_window, m == VXT_CGA ? "VirtualXT (CGA)" : "VirtualXT (Hercules)");
+	SDL_RenderSetLogicalSize(sdl_renderer, x, h);
+
+	sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_RGB332, SDL_TEXTUREACCESS_STREAMING, x, y);	
 	sdl_surface = SDL_CreateRGBSurface(0, x, y, 8, 0xE0, 0x1C, 0x3, 0x0);
 	term.getkey = sdl_getkey;
 }
@@ -108,6 +122,8 @@ static void *open_window(void *ud, vxt_mode_t m, int x, int y)
 static void close_window(void *ud, void *w)
 {
 	SDL_FreeSurface(sdl_surface), sdl_surface = 0;
+	SDL_DestroyTexture(sdl_texture), sdl_texture = 0;
+	SDL_DestroyRenderer(sdl_renderer), sdl_renderer = 0;
 	SDL_DestroyWindow(sdl_window), sdl_window = 0;
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 	term.getkey = term_getkey;
@@ -115,8 +131,9 @@ static void close_window(void *ud, void *w)
 
 static unsigned char *video_buffer(void *ud, void *w)
 {
-	SDL_BlitSurface(sdl_surface, 0, SDL_GetWindowSurface(sdl_window), 0);
-	SDL_UpdateWindowSurface(sdl_window);
+	SDL_UpdateTexture(sdl_texture, 0, sdl_surface->pixels, sdl_surface->pitch);
+	SDL_RenderCopy(sdl_renderer, sdl_texture, 0, 0);
+	SDL_RenderPresent(sdl_renderer);
 	return sdl_surface->pixels;
 }
 
@@ -133,11 +150,6 @@ static size_t io_seek(void *ud, size_t offset, int whence) { return (size_t)lsee
 static struct tm *get_localtime(void *ud) { time((time_t*)ud); return localtime((time_t*)ud); }
 static unsigned short get_millitm(void *ud) { struct timeb c; ftime(&c); return c.millitm; }
 
-// Serial port COM1, 0x3F8 - 0x3FF
-static int com1_filter(void *ud, unsigned short addr, int in) { return addr >= 0x3F8 && addr <= 0x3FF; }
-static unsigned char com1_in(void *ud, unsigned short addr) { return 0; }
-static void com1_out(void *ud,unsigned short addr, unsigned char data) {}
-
 static void close_emulator() { if (e) vxt_close(e); }
 
 static void print_help()
@@ -146,13 +158,15 @@ static void print_help()
 	printf("By Andreas T Jonsson\n\n");
 	printf("Version: " VERSION_STRING "\n\n");
 
-	printf("TODO: Add help text.\n");
+	printf("TODO: Add help text. :)\n");
 }
 
 int main(int argc, char *argv[])
 {
 	int hdboot_arg = 0, noaudio_arg = 0;
 	const char *fd_arg = 0, *hd_arg = 0, *bios_arg = 0;
+
+	if (argc < 2) { print_help(); return 0; }
 	while (--argc && ++argv) {
 		if (!strcmp(*argv, "-h")) { print_help(); return 0; }
 		if (!strcmp(*argv, "-v")) { printf(VERSION_STRING "\n"); return 0; }
@@ -173,22 +187,9 @@ int main(int argc, char *argv[])
 	#endif
 
 	time_t clock_buf;
-	vxt_clock_t clock = {
-		.userdata = &clock_buf,
-		.localtime = get_localtime,
-		.millitm = get_millitm
-	};
-
+	vxt_clock_t clock = {.userdata = &clock_buf, .localtime = get_localtime, .millitm = get_millitm};
 	e = vxt_open(&term, &clock, VXT_INTERNAL_MEMORY);
 	atexit(close_emulator);
-
-	vxt_port_map_t com1 = {
-		.userdata = 0,
-		.filter = com1_filter,
-		.in = com1_in,
-		.out = com1_out
-	};
-	vxt_set_port_map(e, &com1);
 
 	fd.boot = !hdboot_arg;
 	fd.read = io_read;
@@ -238,12 +239,7 @@ int main(int argc, char *argv[])
 		}
 		atexit(quit_sdl);
 
-		vxt_video_t video = {
-			.userdata = 0,
-			.open = open_window,
-			.close = close_window,
-			.buffer = video_buffer
-		};
+		vxt_video_t video = {.userdata = 0, .open = open_window, .close = close_window, .buffer = video_buffer};
 		vxt_set_video(e, &video);
 	#endif
 

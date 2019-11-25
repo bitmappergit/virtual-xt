@@ -113,8 +113,6 @@ const vxt_scancode_t ascii2scan[96] = {
 #include <windows.h>
 #include <WinUser.h>
 
-static void replace_floppy();
-
 static vxt_key_t term_getkey(void *ud)
 {
     INPUT_RECORD event;

@@ -770,13 +770,13 @@ int vxt_step(vxt_emulator_t *e)
 
 		// Poll timer/keyboard every 100 times a second
 		clock_t t = clock();
-		if ((float)(t - e->kb_timer) / CLOCKS_PER_SEC >= 0.01f) {
+		if (t - e->kb_timer >= CLOCKS_PER_SEC / 100) {
 			e->int8_asap = 1;
 			e->kb_timer = t;
 		}
 
 		// Update the video graphics display at 60Hz
-		if (e->video && (float)(t - e->video_timer) / CLOCKS_PER_SEC >= 0.0166f)
+		if (e->video && t - e->video_timer >= CLOCKS_PER_SEC / 60)
 		{
 			e->video_timer = t;
 

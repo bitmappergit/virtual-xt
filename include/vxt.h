@@ -15,9 +15,6 @@ extern "C" {
 #endif
 
 #define VXT_INTERNAL_MEMORY 0
-#ifndef VXT_GRAPHICS_UPDATE_DELAY
-    #define VXT_GRAPHICS_UPDATE_DELAY 360000
-#endif
 
 // Modem control
 #define VXT_SERIAL_MODEM_DATA_TERMINAL_READY            0x1

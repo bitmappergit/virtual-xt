@@ -18,9 +18,6 @@
 #define REGS_BASE 0xF0000
 #define VIDEO_RAM_SIZE 0x10000
 
-// Timer/keyboard update delays (explained later)
-#define KEYBOARD_TIMER_UPDATE_DELAY 20000
-
 // 16-bit register decodes
 #define REG_AX 0
 #define REG_CX 1
@@ -87,9 +84,10 @@ struct vxt_emulator {
 	byte *opcode_stream, *regs8, *vid_mem_base;
 	byte i_rm, i_w, i_reg, i_mod, i_mod_size, i_d, i_reg4bit, raw_opcode_id, xlat_opcode_id, extra, rep_mode, seg_override_en, rep_override_en, trap_flag, int8_asap, scratch_uchar, io_hi_lo, spkr_en;
 	word vid_addr_lookup[VIDEO_RAM_SIZE], *regs16, reg_ip, seg_override, file_index, wave_counter;
-	unsigned int op_source, op_dest, rm_addr, op_to_addr, op_from_addr, i_data0, i_data1, i_data2, scratch_uint, scratch2_uint, inst_counter, set_flags_type, GRAPHICS_X, GRAPHICS_Y, pixel_colors[16], vmem_ctr;
+	unsigned int op_source, op_dest, rm_addr, op_to_addr, op_from_addr, i_data0, i_data1, i_data2, scratch_uint, scratch2_uint, set_flags_type, GRAPHICS_X, GRAPHICS_Y, pixel_colors[16], vmem_ctr;
 	int op_result, scratch_int;
 	void *mem_block;
+	clock_t kb_timer, video_timer;
 	
 	vxt_terminal_t *term;
 	vxt_video_t *video;
@@ -285,11 +283,12 @@ static int AAA_AAS(vxt_emulator_t *e, char which_operation)
 	return (e->regs16[REG_AX] += 262 * which_operation*set_AF(e, set_CF(e, ((e->regs8[REG_AL] & 0x0F) > 9) || e->regs8[FLAG_AF])), e->regs8[REG_AL] &= 0x0F);
 }
 
-vxt_emulator_t *vxt_open(vxt_terminal_t *term, vxt_clock_t *clock, void *mem)
+vxt_emulator_t *vxt_open(vxt_terminal_t *term, vxt_clock_t *clk, void *mem)
 {
 	vxt_emulator_t *e = (vxt_emulator_t*)mem;
 	if (!e) { e = (vxt_emulator_t*)calloc(1, sizeof(vxt_emulator_t)); e->mem_block = e; } else memset(e, 0, sizeof(vxt_emulator_t));
-	e->clock = clock; e->term = term;
+	e->clock = clk; e->term = term;
+	e->kb_timer = e->video_timer = clock();
 
 	// regs16 and reg8 point to F000:0, the start of memory-mapped registers. CS is initialised to F000
 	e->regs16 = (unsigned short *)(e->regs8 = e->mem + REGS_BASE);
@@ -769,13 +768,18 @@ int vxt_step(vxt_emulator_t *e)
 				set_CF(e, 0), set_OF(e, 0);
 		}
 
-		// Poll timer/keyboard every KEYBOARD_TIMER_UPDATE_DELAY instructions
-		if (!(++e->inst_counter % KEYBOARD_TIMER_UPDATE_DELAY))
+		// Poll timer/keyboard every 100 times a second
+		clock_t t = clock();
+		if ((float)(t - e->kb_timer) / CLOCKS_PER_SEC >= 0.01f) {
 			e->int8_asap = 1;
+			e->kb_timer = t;
+		}
 
-		// Update the video graphics display every VXT_GRAPHICS_UPDATE_DELAY instructions
-		if (e->video && !(e->inst_counter % VXT_GRAPHICS_UPDATE_DELAY))
+		// Update the video graphics display at 60Hz
+		if (e->video && (float)(t - e->video_timer) / CLOCKS_PER_SEC >= 0.0166f)
 		{
+			e->video_timer = t;
+
 			// Video card in graphics mode?
 			if (e->io_ports[0x3B8] & 2)
 			{

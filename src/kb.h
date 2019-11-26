@@ -138,7 +138,7 @@ static vxt_key_t term_getkey(void *ud)
                 case VK_TAB: key.scancode |= VXT_KEY_TAB; key.ascii = '\t'; return key;
                 case VK_RETURN: key.scancode |= VXT_KEY_ENTER; key.ascii = '\r'; return key;
                 case VK_CONTROL: key.scancode |= VXT_KEY_CONTROL; return key;
-                case VK_MENU: key.scancode |= VXT_KEY_ALT; return key;
+                case VK_LMENU: key.scancode |= VXT_KEY_ALT; return key;
                 case VK_CAPITAL: key.scancode |= VXT_KEY_CAPSLOCK; return key;
                 case VK_NUMLOCK: key.scancode |= VXT_KEY_NUMLOCK; return key;
                 case VK_SCROLL: key.scancode |= VXT_KEY_SCROLLOCK; return key;
@@ -218,7 +218,7 @@ static vxt_key_t sdl_getkey(void *ud)
                 case SDLK_LEFT: case SDLK_KP_4: key.scancode |= VXT_KEY_KP_LEFT_4; return key;
                 case SDLK_RIGHT: case SDLK_KP_6: key.scancode |= VXT_KEY_KP_RIGHT_6; return key;
                 case SDLK_LCTRL: case SDLK_RCTRL: key.scancode |= VXT_KEY_CONTROL; return key;
-                case SDLK_LALT: case SDLK_RALT: key.scancode |= VXT_KEY_ALT; return key;
+                case SDLK_LALT: key.scancode |= VXT_KEY_ALT; return key;
                 case SDLK_NUMLOCKCLEAR: key.scancode |= VXT_KEY_NUMLOCK; return key;
                 case SDLK_SCROLLLOCK: key.scancode |= VXT_KEY_SCROLLOCK; return key;
                 case SDLK_HOME: case SDLK_KP_7: key.scancode |= VXT_KEY_KP_HOME_7; return key;

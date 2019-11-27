@@ -22,7 +22,9 @@ install:
 
 build_script:
   - .\tools\build\premake4\premake4.exe gmake
-  - cd C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64
+  - cd C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\bin
+  - dir
+  - cd C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\x86_64-w64-mingw32
   - dir
   - make config=release
 

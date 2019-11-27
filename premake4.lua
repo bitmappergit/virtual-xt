@@ -1,6 +1,6 @@
 for _,arg in ipairs(_ARGS) do
-    if arg == 'nosdl' then nosdl = true
-    elseif arg == 'wall' then wall = true
+    if arg == '--nosdl' then nosdl = true
+    elseif arg == '--wall' then wall = true
     else error('Unknown argument: ' .. arg) end
 end
 

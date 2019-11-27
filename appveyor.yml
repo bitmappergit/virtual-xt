@@ -16,16 +16,12 @@ environment:
     BIT: 64
 
 install:
-  - set PATH=C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\bin;%PATH%
+  - set PATH=%APPVEYOR_BUILD_FOLDER%\tools\build\premake4;C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\bin;%PATH%
   #- appveyor DownloadFile http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-windows.zip/download
   #- 7z x premake-4.4-beta5-windows.zip
 
 build_script:
-  - .\tools\build\premake4\premake4.exe gmake
-  - cd C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\bin
-  - dir
-  - cd C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\x86_64-w64-mingw32
-  - dir
+  - premake4.exe gmake --nosdl
   - mingw32-make.exe config=release
 
 artifacts:

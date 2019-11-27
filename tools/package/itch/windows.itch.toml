@@ -1,5 +1,6 @@
 [[actions]]
-name = "play"
+name = "Boot"
 path = "virtualxt.exe"
 platform = "windows"
 console = true
+args = ["-f freedos.img"]

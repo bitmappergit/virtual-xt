@@ -165,8 +165,6 @@ int main(int argc, char *argv[])
 {
 	int hdboot_arg = 0, noaudio_arg = 0;
 	const char *fd_arg = 0, *hd_arg = 0, *bios_arg = 0;
-
-	if (argc < 2) { print_help(); return 0; }
 	while (--argc && ++argv) {
 		if (!strcmp(*argv, "-h")) { print_help(); return 0; }
 		if (!strcmp(*argv, "-v")) { printf(VERSION_STRING "\n"); return 0; }
@@ -245,6 +243,9 @@ int main(int argc, char *argv[])
 
 	clear_screen();
 	atexit(clear_screen);
+
+	if (!fd_arg && !hd_arg)
+		replace_floppy();
 
 	while (vxt_step(e))
 	{

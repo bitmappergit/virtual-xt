@@ -20,7 +20,7 @@ install:
   #- 7z x premake-4.4-beta5-windows.zip
 
 build_script:
-  - tools/build/premake4 gmake
+  - ./tools/build/premake4/premake4.exe gmake
   - make config=release
 
 artifacts:

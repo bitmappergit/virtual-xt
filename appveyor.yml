@@ -1,0 +1,26 @@
+version: 0.0.1.{build}
+
+platform: x64
+
+branches:
+  only:
+  - master
+
+environment:
+  matrix:
+  - COMPILER: msys2
+    PLATFORM: x64
+    MSYS2_ARCH: x86_64
+    MSYS2_DIR: msys64
+    MSYSTEM: MINGW64
+    BIT: 64
+
+install:
+  - appveyor DownloadFile http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-windows.zip/download
+  - 7z x premake-4.4-beta5-windows.zip
+
+build_script:
+  - premake4
+
+#artifacts:
+#  - path: virtualxt_0.0.1.exe

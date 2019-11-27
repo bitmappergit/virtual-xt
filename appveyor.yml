@@ -17,12 +17,17 @@ environment:
 
 install:
   - set PATH=%APPVEYOR_BUILD_FOLDER%\tools\build\premake4;C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\bin;%PATH%
-  #- appveyor DownloadFile http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-windows.zip/download
-  #- 7z x premake-4.4-beta5-windows.zip
+  - curl -L -o butler.zip https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default
+  - 7z x butler.zip
+  - curl -L -o premake.zip http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-windows.zip/download
+  - 7z x premake.zip
+  - dir
 
 build_script:
   - premake4.exe gmake --nosdl
   - mingw32-make.exe config=release
+
+#after_build:
 
 artifacts:
   - path: virtualxt.exe

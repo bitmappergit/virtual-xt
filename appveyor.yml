@@ -16,12 +16,15 @@ environment:
     BIT: 64
 
 install:
+  - set PATH=C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\bin;%PATH%
   #- appveyor DownloadFile http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-windows.zip/download
   #- 7z x premake-4.4-beta5-windows.zip
 
 build_script:
   - .\tools\build\premake4\premake4.exe gmake
   - make config=release
+  - cd C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1
+  - dir
 
 artifacts:
   - path: virtualxt.exe

@@ -16,12 +16,12 @@ environment:
     BIT: 64
 
 install:
-  - appveyor DownloadFile http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-windows.zip/download
-  - dir
-  - 7z x premake-4.4-beta5-windows.zip
+  #- appveyor DownloadFile http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-windows.zip/download
+  #- 7z x premake-4.4-beta5-windows.zip
 
 build_script:
-  - premake4
+  - tools/build/premake4 gmake
+  - make config=release
 
-#artifacts:
-#  - path: virtualxt_0.0.1.exe
+artifacts:
+  - path: virtualxt.exe

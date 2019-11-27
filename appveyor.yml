@@ -17,6 +17,7 @@ environment:
 
 install:
   - appveyor DownloadFile http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-windows.zip/download
+  - dir
   - 7z x premake-4.4-beta5-windows.zip
 
 build_script:

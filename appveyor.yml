@@ -26,12 +26,12 @@ install:
   - dir
   - tree .
   - dir C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64
-  - xcopy SDL2-2.0.10\x86_64-w64-mingw32\* C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64 /e /d /y /h /r /c
+  - xcopy SDL2-2.0.10\x86_64-w64-mingw32\ C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64 /e /d /y /h /r /c
   - dir C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64
   - dir C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\include
 
 build_script:
-  - premake4 gmake --nosdl
+  - premake4 gmake
   - mingw32-make config=release
 
 after_build:

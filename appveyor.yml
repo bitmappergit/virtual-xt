@@ -21,6 +21,10 @@ install:
   - 7z x premake.zip
   - curl -L -o butler.zip https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default
   - 7z x butler.zip
+  - curl -L -o sdl.tar.gz https://www.libsdl.org/release/SDL2-devel-2.0.10-mingw.tar.gz
+  - 7z x sdl.tar.gz
+  - dir
+  - dir C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64
 
 build_script:
   - premake4 gmake --nosdl

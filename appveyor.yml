@@ -26,9 +26,7 @@ install:
 
   - curl -L -o sdl.tar.gz https://www.libsdl.org/release/SDL2-devel-2.0.10-mingw.tar.gz
   - 7z x sdl.tar.gz && 7z x sdl.tar
-  - dir
   - xcopy SDL2-2.0.10\x86_64-w64-mingw32\* C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\x86_64-w64-mingw32 /e /d /y /h /r /c
-  - dir C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\x86_64-w64-mingw32
 
 build_script:
   - premake4 gmake
@@ -37,6 +35,7 @@ build_script:
 after_build:
   - tools\package\itch\package.bat
   - cd package
+  
   - butler validate virtualxt
-  #- butler login
-  #- butler push virtualxt phix/virtualxt:windows --userversion %APPVEYOR_BUILD_VERSION%
+  - butler login
+  - butler push virtualxt phix/virtualxt:windows --userversion %APPVEYOR_BUILD_VERSION%

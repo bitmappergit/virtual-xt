@@ -182,6 +182,7 @@ int main(int argc, char *argv[])
 		DWORD dwMode = 0;
 		if (!GetConsoleMode(hOut, &dwMode)) return GetLastError();
 		if (!SetConsoleMode(hOut, dwMode|ENABLE_VIRTUAL_TERMINAL_PROCESSING)) return GetLastError();
+		if (!SetConsoleOutputCP(437)) return GetLastError();
 	
 		// Try to adjust the console size
 	    COORD const size = { 80, 25 };

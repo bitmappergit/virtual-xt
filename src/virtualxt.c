@@ -188,6 +188,7 @@ int main(int argc, char *argv[])
 		SMALL_RECT const window = { 0, 0, size.X - 1, size.Y - 1 };
 		SetConsoleWindowInfo(hOut, 1, &window);
 		SetConsoleScreenBufferSize(hOut, size);
+		SetConsoleWindowInfo(hOut, 1, &window); // Needs to be done again
 	#endif
 
 	time_t clock_buf;

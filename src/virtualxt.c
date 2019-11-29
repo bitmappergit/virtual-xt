@@ -182,6 +182,12 @@ int main(int argc, char *argv[])
 		DWORD dwMode = 0;
 		if (!GetConsoleMode(hOut, &dwMode)) return GetLastError();
 		if (!SetConsoleMode(hOut, dwMode|ENABLE_VIRTUAL_TERMINAL_PROCESSING)) return GetLastError();
+	
+		// Try to adjust the console size
+	    COORD const size = { 80, 25 };
+		SMALL_RECT const window = { 0, 0, size.X - 1, size.Y - 1 };
+		SetConsoleWindowInfo(hOut, 1, &window);
+		SetConsoleScreenBufferSize(hOut, size);
 	#endif
 
 	time_t clock_buf;

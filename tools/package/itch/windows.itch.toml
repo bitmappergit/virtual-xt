@@ -11,4 +11,4 @@ console = true
 
 [[actions]]
 name = "manual"
-path = "README.md"
+path = "manual/index.html"

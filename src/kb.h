@@ -133,12 +133,17 @@ static vxt_key_t term_getkey(void *ud)
 
             switch (ke->wVirtualKeyCode)
             {
+                case 'A': if (ke->dwControlKeyState&RIGHT_ALT_PRESSED) {
+                    replace_floppy();
+                    return key;
+                }
+                break;
                 case VK_ESCAPE: key.scancode |= VXT_KEY_ESCAPE; key.ascii = 0x1B; return key;
                 case VK_BACK: key.scancode |= VXT_KEY_BACKSPACE; key.ascii = 0x8; return key;
                 case VK_TAB: key.scancode |= VXT_KEY_TAB; key.ascii = '\t'; return key;
                 case VK_RETURN: key.scancode |= VXT_KEY_ENTER; key.ascii = '\r'; return key;
                 case VK_CONTROL: key.scancode |= VXT_KEY_CONTROL; return key;
-                case VK_LMENU: key.scancode |= VXT_KEY_ALT; return key;
+                case VK_MENU: key.scancode |= VXT_KEY_ALT; return key;
                 case VK_CAPITAL: key.scancode |= VXT_KEY_CAPSLOCK; return key;
                 case VK_NUMLOCK: key.scancode |= VXT_KEY_NUMLOCK; return key;
                 case VK_SCROLL: key.scancode |= VXT_KEY_SCROLLOCK; return key;
@@ -162,27 +167,15 @@ static vxt_key_t term_getkey(void *ud)
                 case VK_F8: key.scancode |= VXT_KEY_F8; return key;
                 case VK_F9: key.scancode |= VXT_KEY_F9; return key;
                 case VK_F10: key.scancode |= VXT_KEY_F10; return key;
-                case VK_SHIFT: key.scancode |= (GetAsyncKeyState(VK_LSHIFT) & 0x8000 != 0) ? VXT_KEY_LSHIFT : VXT_KEY_RSHIFT; return key;
-                case VK_SNAPSHOT:
-                {
-                    if (GetAsyncKeyState(VK_MENU) & 0x8000 != 0)
-                    {
-                        key.scancode = VXT_KEY_INVALID;
-                        replace_floppy();
-                        return key;
-                    }
-                    key.scancode |= VXT_KEY_PRINT;
-                    return key;
-                }
-                default:
-                {
-                    char ch = ke->uChar.AsciiChar;
-                    if (ch >= 0x20 && ch <= 0x7F) {
-                        key.scancode |= ascii2scan[ch - 0x20];
-                        key.ascii = ch;
-                        return key;
-                    }
-                }
+                case VK_SHIFT: key.scancode |= (GetAsyncKeyState(VK_LSHIFT) & 0x8000) ? VXT_KEY_LSHIFT : VXT_KEY_RSHIFT; return key;
+                case VK_SNAPSHOT: key.scancode |= VXT_KEY_PRINT; return key;
+            }
+
+            char ch = ke->uChar.AsciiChar;
+            if (ch >= 0x20 && ch <= 0x7F) {
+                key.scancode |= ascii2scan[ch - 0x20];
+                key.ascii = ch;
+                return key;
             }
         }
     }
@@ -198,7 +191,9 @@ static SDL_Window *sdl_window = 0;
 
 static vxt_key_t sdl_getkey(void *ud)
 {
-	vxt_key_t key = term_getkey(ud);
+    term_getkey(ud); // Drain terminal
+	vxt_key_t key = {.scancode = VXT_KEY_INVALID, .ascii = 0};
+
 	if (sdl_window)
 	{
 		SDL_Event ev;
@@ -241,6 +236,15 @@ static vxt_key_t sdl_getkey(void *ud)
                 case SDLK_RSHIFT: key.scancode |= VXT_KEY_RSHIFT; return key;
                 case SDLK_PRINTSCREEN: key.scancode |= VXT_KEY_PRINT; return key;
                 default: if (ev.key.keysym.sym >= 0x20 && ev.key.keysym.sym <= 0x7F) {
+                    if (ev.key.keysym.mod&KMOD_RALT)
+                    {
+                        if (ev.key.keysym.sym)
+                        {
+                            replace_floppy();
+                            return key;
+                        }
+                    }
+
                     char ch = (char)ev.key.keysym.sym;
                     key.scancode |= ascii2scan[ch - 0x20];
                     key.ascii = ch;

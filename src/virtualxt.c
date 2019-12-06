@@ -171,8 +171,8 @@ static void textmode(unsigned char *mem, unsigned char *font, unsigned char curs
 		blit_char(sdl_surface, font, ch, mem[i+1], (index % 80) * 8, (index / 80) * 8);
 	}
 
-	if (cursor)
-		blit_char(sdl_surface, font, '_', 0x8F, cx * 8, cy * 8);
+	if (cursor && vxt_blink(e))
+		blit_char(sdl_surface, font, '_', (mem[160*cy+cx*2+1] & 0x70) | 0xF, cx * 8, cy * 8);
 
 	SDL_UpdateTexture(sdl_texture, 0, sdl_surface->pixels, sdl_surface->pitch);
 	SDL_RenderCopy(sdl_renderer, sdl_texture, 0, 0);

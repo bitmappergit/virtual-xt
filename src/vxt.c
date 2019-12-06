@@ -81,17 +81,16 @@ typedef unsigned short word;
 
 struct vxt_emulator {
 	byte mem[RAM_SIZE], io_ports[IO_PORT_COUNT];
-	byte *opcode_stream, *regs8, *vid_mem_base;
+	byte *opcode_stream, *regs8, *vid_mem_base, *font;
 	byte i_rm, i_w, i_reg, i_mod, i_mod_size, i_d, i_reg4bit, raw_opcode_id, xlat_opcode_id, extra, rep_mode, seg_override_en, rep_override_en, trap_flag, int8_asap, scratch_uchar, io_hi_lo, spkr_en;
 	word vid_addr_lookup[VIDEO_RAM_SIZE], *regs16, reg_ip, seg_override, file_index, wave_counter;
-	unsigned int op_source, op_dest, rm_addr, op_to_addr, op_from_addr, i_data0, i_data1, i_data2, scratch_uint, scratch2_uint, set_flags_type, GRAPHICS_X, GRAPHICS_Y, pixel_colors[16], vmem_ctr;
-	int op_result, scratch_int;
+	unsigned int pixel_colors[16], op_source, op_dest, rm_addr, op_to_addr, op_from_addr, i_data0, i_data1, i_data2, scratch_uint, scratch2_uint, set_flags_type, GRAPHICS_X, GRAPHICS_Y, vmem_ctr;
+	int op_result, scratch_int, blink;
 	void *mem_block;
 	clock_t kb_timer, video_timer;
 	
-	vxt_terminal_t *term;
+	byte video_mode;
 	vxt_video_t *video;
-	void *window;
 	
 	vxt_serial_t *serial[4];
 	vxt_drive_t *disk[2];
@@ -283,12 +282,13 @@ static int AAA_AAS(vxt_emulator_t *e, char which_operation)
 	return (e->regs16[REG_AX] += 262 * which_operation*set_AF(e, set_CF(e, ((e->regs8[REG_AL] & 0x0F) > 9) || e->regs8[FLAG_AF])), e->regs8[REG_AL] &= 0x0F);
 }
 
-vxt_emulator_t *vxt_open(vxt_terminal_t *term, vxt_clock_t *clk, void *mem)
+vxt_emulator_t *vxt_open(vxt_video_t *video, vxt_clock_t *clk, void *mem)
 {
 	vxt_emulator_t *e = (vxt_emulator_t*)mem;
 	if (!e) { e = (vxt_emulator_t*)calloc(1, sizeof(vxt_emulator_t)); e->mem_block = e; } else memset(e, 0, sizeof(vxt_emulator_t));
-	e->clock = clk; e->term = term;
+	e->clock = clk; e->video = video;
 	e->kb_timer = e->video_timer = clock();
+	e->video_mode = 0xFF;
 
 	// regs16 and reg8 point to F000:0, the start of memory-mapped registers. CS is initialised to F000
 	e->regs16 = (unsigned short *)(e->regs8 = e->mem + REGS_BASE);
@@ -312,7 +312,9 @@ void vxt_audio_callback(vxt_emulator_t *e, unsigned char *stream, int len)
 void vxt_load_bios(vxt_emulator_t *e, const void *data, size_t sz)
 {
 	// Load BIOS image into F000:0100, and set IP to 0100
-	memcpy(e->regs8 + (e->reg_ip = 0x100), data, sz < 0xFF00 ? sz : 0xFF00);
+	word *dst = (word*)(e->regs8 + (e->reg_ip = 0x100));
+	memcpy(dst, data, sz < 0xFF00 ? sz : 0xFF00);
+	e->font = e->regs8 + dst[1];
 }
 
 void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd) {
@@ -331,10 +333,10 @@ void vxt_replace_floppy(vxt_emulator_t *e, vxt_drive_t *fd) {
 
 void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac) { e->pause_audio = ac; }
 void vxt_set_audio_silence(vxt_emulator_t *e, unsigned char s) { e->audio_silence = s; }
-void vxt_set_video(vxt_emulator_t *e, vxt_video_t *video) { e->video = video; }
 void vxt_set_port_map(vxt_emulator_t *e, vxt_port_map_t *map) { e->port_map = map; }
 void vxt_set_serial(vxt_emulator_t *e, int port, vxt_serial_t *com) { e->serial[port-1] = com; }
 void vxt_close(vxt_emulator_t *e) { if (e->mem_block) free(e->mem_block); }
+int vxt_blink(vxt_emulator_t *e) { return e->blink; }
 size_t vxt_memory_required() { return sizeof(vxt_emulator_t); }
 
 int vxt_step(vxt_emulator_t *e)
@@ -715,7 +717,8 @@ int vxt_step(vxt_emulator_t *e)
 				switch ((char)e->i_data0)
 				{
 					OPCODE_CHAIN 0: // PUTCHAR_AL
-						e->term->putchar(e->term->userdata, *e->regs8)
+						//e->term->putchar(e->term->userdata, *e->regs8)
+						{}
 					OPCODE 1: // GET_RTC
 						memcpy(e->mem + SEGREG(REG_ES, REG_BX,), e->clock->localtime(e->clock->userdata), sizeof(struct tm));
 						CAST(short)e->mem[SEGREG(REG_ES, REG_BX, 36+)] = e->clock->millitm(e->clock->userdata);
@@ -776,42 +779,47 @@ int vxt_step(vxt_emulator_t *e)
 		}
 
 		// Update the video graphics display at 60Hz
-		if (e->video && t - e->video_timer >= CLOCKS_PER_SEC / 60)
+		if (t - e->video_timer >= CLOCKS_PER_SEC / 60)
 		{
 			e->video_timer = t;
+			e->blink = (t / (CLOCKS_PER_SEC / 3)) % 2;
 
-			// Video card in graphics mode?
-			if (e->io_ports[0x3B8] & 2)
+			byte vm = e->io_ports[0x3B8];
+			if (e->video_mode != vm)
 			{
-				// If we don't already have an window open, set it up and compute color and video memory translation tables
-				if (!e->window)
-				{
-					vxt_mode_t video_mode = e->mem[0x4AC] ? VXT_CGA : VXT_HERCULES;
-					e->window = e->video->open(e->video->userdata, video_mode, e->GRAPHICS_X, e->GRAPHICS_Y);
-					if (video_mode == VXT_CGA)
-					{
-						for (int i = 0; i < 16; i++)
-							e->pixel_colors[i] = cga_colors[(i & 12) >> 2] + (cga_colors[i & 3] << 16); // CGA -> RGB332	
-					}
-					else
-					{
-						for (int i = 0; i < 16; i++)
-							e->pixel_colors[i] = 0xFF*(((i & 1) << 24) + ((i & 2) << 15) + ((i & 4) << 6) + ((i & 8) >> 3)); // Hercules -> RGB332
-					}
+				e->video_mode = vm;
 
+				// Video card in graphics mode?
+				if (vm & 2)
+				{
+					// Create memory map.
 					for (int i = 0; i < e->GRAPHICS_X * e->GRAPHICS_Y / 4; i++)
 						e->vid_addr_lookup[i] = i / e->GRAPHICS_X * (e->GRAPHICS_X / 8) + (i / 2) % (e->GRAPHICS_X / 8) + 0x2000*(e->mem[0x4AC] ? (2 * i / e->GRAPHICS_X) % 2 : (4 * i / e->GRAPHICS_X) % 4);
+					
+					e->video->initialize(e->video->userdata, e->mem[0x4AC] ? VXT_CGA : VXT_HERCULES, e->GRAPHICS_X, e->GRAPHICS_Y);
 				}
+				else
+				{
+					e->video->initialize(e->video->userdata, VXT_TEXT, 640, 200);
+				}
+			}
 
-				// Refresh video display from emulated graphics card video RAM
-				unsigned *pixels = (unsigned*)e->video->buffer(e->video->userdata, e->window);
+			if (vm & 2)
+			{
+				if (e->mem[0x4AC]) for (int i = 0; i < 16; i++)
+					e->pixel_colors[i] = cga_colors[(i & 12) >> 2] + (cga_colors[i & 3] << 16); // CGA -> RGB332	
+				else for (int i = 0; i < 16; i++)
+					e->pixel_colors[i] = 0xFF*(((i & 1) << 24) + ((i & 2) << 15) + ((i & 4) << 6) + ((i & 8) >> 3)); // Hercules -> RGB332
+
+				// Refresh video display from emulated graphics card video RAM.
+				unsigned *pixels = (unsigned*)e->video->backbuffer(e->video->userdata);
 				e->vid_mem_base = e->mem + 0xB0000 + 0x8000*(e->mem[0x4AC] ? 1 : e->io_ports[0x3B8] >> 7); // B800:0 for CGA/Hercules bank 2, B000:0 for Hercules bank 1
 				for (int i = 0; i < e->GRAPHICS_X * e->GRAPHICS_Y / 4; i++)
 					pixels[i] = e->pixel_colors[15 & (e->vid_mem_base[e->vid_addr_lookup[i]] >> 4*!(i & 1))];
 			}
-			else if (e->window) // Application has gone back to text mode, so close the window
+			else
 			{
-				e->video->close(e->video->userdata, e->window), e->window = 0;
+				e->video->textmode(&e->mem[0xB8000], e->font, e->mem[0x4A1], e->mem[0x49D], e->mem[0x49E]);
 			}
 		}
 
@@ -826,7 +834,7 @@ int vxt_step(vxt_emulator_t *e)
 		if (e->int8_asap && !e->seg_override_en && !e->rep_override_en && e->regs8[FLAG_IF] && !e->regs8[FLAG_TF])
 		{
 			pc_interrupt(e, 0xA), e->int8_asap = 0;
-			vxt_key_t key = e->term->getkey(e->term->userdata);
+			vxt_key_t key = e->video->getkey(e->video->userdata);
 			if (key.scancode) {
 				e->mem[0x4A6] = key.scancode;
 				e->mem[0x4A6+1] = key.ascii;

@@ -4,6 +4,7 @@
 // This work is licensed under the MIT License. See included LICENSE file.
 
 #include "vxt.h"
+#include "kb.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -11,13 +12,15 @@
 #include <sys/timeb.h>
 #include <assert.h>
 
+#include <SDL2/SDL.h>
+
 #ifdef _WIN32
 	#include <windows.h>
 	#include <io.h>
-	#include <conio.h>
-	
-	#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
-		#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+
+	// This is an issue with the MinGW. /aj
+	#ifdef main
+		#undef main
 	#endif
 #endif
 
@@ -26,7 +29,31 @@
 vxt_emulator_t *e = 0;
 vxt_drive_t fd = {0};
 
-static void replace_floppy()
+const int text_color[] = {
+	0x000000,
+	0x0000AA,
+	0x00AA00,
+	0x00AAAA,
+	0xAA0000,
+	0xAA00AA,
+	0xAA5500,
+	0xAAAAAA,
+	0x555555,
+	0x5555FF,
+	0x55FF55,
+	0x55FFFF,
+	0xFF5555,
+	0xFF55FF,
+	0xFFFF55,
+	0xFFFFFF
+};
+
+SDL_Surface *sdl_surface = 0;
+SDL_Texture *sdl_texture = 0;
+SDL_Renderer *sdl_renderer = 0;
+SDL_AudioSpec sdl_audio = {44100, AUDIO_U8, 1, 0, 128};
+
+void replace_floppy()
 {
 	int f = -1;
 	char buf[256] = {0};
@@ -64,84 +91,49 @@ insert:
 	vxt_replace_floppy(e, &fd);
 }
 
-// Keyboard helpers.
-#include "kb.h"
-
-#ifndef _WIN32
-	#error Not supported!
-
-	#include <fcntl.h>
-	
-	unsigned char unix_key = 0;
-	static int ___kbhit(void *ud) { return read(0, &unix_key, 1); }
-	static int ___getch(void *ud) { return (int)unix_key; }
-#endif
-
-static void term_putchar(void *ud, unsigned char ch) { putchar(ch); }
-
-vxt_terminal_t term = {
-	.userdata = 0,
-	.getkey = term_getkey,
-	.putchar = term_putchar
-};
-
-char bios_buff[0xFFFF];
-
-#ifndef NO_SDL
-
-#include <SDL2/SDL.h>
-
-// This is an issue with the MinGW. /aj
-#ifdef _WIN32
-	#ifdef main
-		#undef main
-	#endif
-#endif
-
-SDL_Surface *sdl_surface = 0;
-SDL_Texture *sdl_texture = 0;
-SDL_Renderer *sdl_renderer = 0;
-SDL_AudioSpec sdl_audio = {44100, AUDIO_U8, 1, 0, 128};
-
-static void *open_window(void *ud, vxt_mode_t m, int x, int y)
+static void close_window()
 {
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
-	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+	SDL_FreeSurface(sdl_surface); sdl_surface = 0;
+	SDL_DestroyTexture(sdl_texture); sdl_texture = 0;
+	SDL_DestroyRenderer(sdl_renderer); sdl_renderer = 0;
+	SDL_DestroyWindow(sdl_window); sdl_window = 0;
+}
 
-	SDL_Init(SDL_INIT_VIDEO);
+static void open_window(void *ud, vxt_mode_t m, int x, int y)
+{
+	if (sdl_window) {
+		SDL_FreeSurface(sdl_surface); sdl_surface = 0;
+		SDL_DestroyTexture(sdl_texture); sdl_texture = 0;
+	} else {
+		SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+		SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+		SDL_SetHint(SDL_HINT_WINDOWS_NO_CLOSE_ON_ALT_F4, "1");
+
+		SDL_Init(SDL_INIT_VIDEO);
+		SDL_CreateWindowAndRenderer(640, 480, SDL_WINDOW_RESIZABLE|SDL_WINDOW_INPUT_FOCUS|SDL_WINDOW_MOUSE_FOCUS, &sdl_window, &sdl_renderer);
+	}
+
 	int h = (int)((float)x / (4.f / 3.f));
-	SDL_CreateWindowAndRenderer(x, h, SDL_WINDOW_RESIZABLE|SDL_WINDOW_INPUT_FOCUS|SDL_WINDOW_MOUSE_FOCUS, &sdl_window, &sdl_renderer);
-	SDL_SetWindowTitle(sdl_window, m == VXT_CGA ? "VirtualXT (CGA)" : "VirtualXT (Hercules)");
 	SDL_RenderSetLogicalSize(sdl_renderer, x, h);
 
-	sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_RGB332, SDL_TEXTUREACCESS_STREAMING, x, y);	
-	sdl_surface = SDL_CreateRGBSurface(0, x, y, 8, 0xE0, 0x1C, 0x3, 0x0);
-	term.getkey = sdl_getkey;
+	if (m == VXT_TEXT) {
+		SDL_SetWindowTitle(sdl_window, "VirtualXT");
+		sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING, x, y);	
+		sdl_surface = SDL_CreateRGBSurface(0, x, y, 32, 0, 0, 0, 0);
+	} else {
+		SDL_SetWindowTitle(sdl_window, m == VXT_CGA ? "VirtualXT (CGA)" : "VirtualXT (Hercules)");
+		sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_RGB332, SDL_TEXTUREACCESS_STREAMING, x, y);	
+		sdl_surface = SDL_CreateRGBSurface(0, x, y, 8, 0xE0, 0x1C, 0x3, 0x0);
+	}
 }
 
-static void close_window(void *ud, void *w)
-{
-	SDL_FreeSurface(sdl_surface), sdl_surface = 0;
-	SDL_DestroyTexture(sdl_texture), sdl_texture = 0;
-	SDL_DestroyRenderer(sdl_renderer), sdl_renderer = 0;
-	SDL_DestroyWindow(sdl_window), sdl_window = 0;
-	SDL_QuitSubSystem(SDL_INIT_VIDEO);
-	term.getkey = term_getkey;
-}
-
-static unsigned char *video_buffer(void *ud, void *w)
+static unsigned char *video_buffer(void *ud)
 {
 	SDL_UpdateTexture(sdl_texture, 0, sdl_surface->pixels, sdl_surface->pitch);
 	SDL_RenderCopy(sdl_renderer, sdl_texture, 0, 0);
 	SDL_RenderPresent(sdl_renderer);
 	return sdl_surface->pixels;
 }
-
-static void quit_sdl() { if (sdl_window || sdl_surface) close_window(0, 0); SDL_Quit(); }
-
-#endif
-
-static void clear_screen() { printf("\033[2J\033[H"); }
 
 static size_t io_read(void *ud, void* buf, size_t count) { return (size_t)read((int)(intptr_t)ud, buf, count); }
 static size_t io_write(void *ud, const void *buf, size_t count) { return (size_t)write((int)(intptr_t)ud, buf, count); }
@@ -150,7 +142,42 @@ static size_t io_seek(void *ud, size_t offset, int whence) { return (size_t)lsee
 static struct tm *get_localtime(void *ud) { time((time_t*)ud); return localtime((time_t*)ud); }
 static unsigned short get_millitm(void *ud) { struct timeb c; ftime(&c); return c.millitm; }
 
+static void quit_sdl() { if (sdl_window) close_window(); SDL_Quit(); }
 static void close_emulator() { if (e) vxt_close(e); }
+
+static void blit_char(SDL_Surface *dst, unsigned char *font, unsigned char ch, unsigned char attrib, int x, int y) {
+	assert(dst->format->BytesPerPixel == 4);
+
+	unsigned *pixels = (unsigned*)dst->pixels;
+	unsigned bgcolor = text_color[(attrib&0x70)>>4];
+	unsigned fgcolor = ((attrib&0x80) && vxt_blink(e)) ? bgcolor : text_color[attrib&0xF];
+	
+	for (int i = 0; i < 8; i++) {
+		unsigned char glyph_line = font[ch*8+i];
+
+		for (int j = 0; j < 8; j++) {
+			unsigned char mask = 0x80 >> j;
+			unsigned fg = (glyph_line & mask ? fgcolor : bgcolor);
+			pixels[dst->w * (y + i) + x + j] = fg | 0xFF000000;
+		}
+	}
+}
+
+static void textmode(unsigned char *mem, unsigned char *font, unsigned char cursor, unsigned char cx, unsigned char cy) {
+	const int nchar = 80*25;
+	for (int i = 0; i < nchar * 2; i+=2) {
+		unsigned char ch = mem[i];
+		int index = i / 2;
+		blit_char(sdl_surface, font, ch, mem[i+1], (index % 80) * 8, (index / 80) * 8);
+	}
+
+	if (cursor)
+		blit_char(sdl_surface, font, '_', 0x8F, cx * 8, cy * 8);
+
+	SDL_UpdateTexture(sdl_texture, 0, sdl_surface->pixels, sdl_surface->pitch);
+	SDL_RenderCopy(sdl_renderer, sdl_texture, 0, 0);
+	SDL_RenderPresent(sdl_renderer);
+}
 
 static void print_help()
 {
@@ -176,25 +203,10 @@ int main(int argc, char *argv[])
 		printf("Invalid parameter: %s\n", *argv); return -1;
 	}
 
-	#ifdef _WIN32
-		HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-		if (hOut == INVALID_HANDLE_VALUE) return GetLastError();
-		DWORD dwMode = 0;
-		if (!GetConsoleMode(hOut, &dwMode)) return GetLastError();
-		if (!SetConsoleMode(hOut, dwMode|ENABLE_VIRTUAL_TERMINAL_PROCESSING)) return GetLastError();
-		if (!SetConsoleOutputCP(437)) return GetLastError();
-	
-		// Try to adjust the console size
-	    COORD const size = { 80, 25 };
-		SMALL_RECT const window = { 0, 0, size.X - 1, size.Y - 1 };
-		SetConsoleWindowInfo(hOut, 1, &window);
-		SetConsoleScreenBufferSize(hOut, size);
-		SetConsoleWindowInfo(hOut, 1, &window); // Needs to be done again
-	#endif
-
 	time_t clock_buf;
 	vxt_clock_t clock = {.userdata = &clock_buf, .localtime = get_localtime, .millitm = get_millitm};
-	e = vxt_open(&term, &clock, VXT_INTERNAL_MEMORY);
+	vxt_video_t video = {.userdata = 0, .getkey = sdl_getkey, .initialize = open_window, .backbuffer = video_buffer, .textmode = textmode};
+	e = vxt_open(&video, &clock, VXT_INTERNAL_MEMORY);
 	atexit(close_emulator);
 
 	fd.boot = !hdboot_arg;
@@ -223,34 +235,27 @@ int main(int argc, char *argv[])
 
 	if (bios_arg)
 	{
+		char bios_buff[0xFFFF];
 		FILE *fp = fopen(bios_arg, "rb");
 		if (!fp) { printf("Can't open BIOS image: %s\n", bios_arg); return -1; }
 		vxt_load_bios(e, bios_buff, fread(bios_buff, 1, sizeof(bios_buff), fp));
 		fclose(fp);
 	}
 
-	#ifndef NO_SDL
-		if (!noaudio_arg)
-		{
-			SDL_Init(SDL_INIT_AUDIO);
-			sdl_audio.callback = (SDL_AudioCallback)vxt_audio_callback;
-			sdl_audio.userdata = (void*)e;
-			#ifdef _WIN32
-				sdl_audio.samples = 512;
-			#endif
-			SDL_OpenAudio(&sdl_audio, 0);
+	if (!noaudio_arg)
+	{
+		SDL_Init(SDL_INIT_AUDIO);
+		sdl_audio.callback = (SDL_AudioCallback)vxt_audio_callback;
+		sdl_audio.userdata = (void*)e;
+		#ifdef _WIN32
+			sdl_audio.samples = 512;
+		#endif
+		SDL_OpenAudio(&sdl_audio, 0);
 
-			vxt_set_audio_control(e, (vxt_pause_audio_t)SDL_PauseAudio);
-			vxt_set_audio_silence(e, sdl_audio.silence);
-		}
-		atexit(quit_sdl);
-
-		vxt_video_t video = {.userdata = 0, .open = open_window, .close = close_window, .buffer = video_buffer};
-		vxt_set_video(e, &video);
-	#endif
-
-	clear_screen();
-	atexit(clear_screen);
+		vxt_set_audio_control(e, (vxt_pause_audio_t)SDL_PauseAudio);
+		vxt_set_audio_silence(e, sdl_audio.silence);
+	}
+	atexit(quit_sdl);
 
 	if (!fd_arg && !hd_arg)
 		replace_floppy();

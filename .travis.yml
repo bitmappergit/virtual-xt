@@ -29,8 +29,6 @@ after_success:
   - ./tools/package/itch/package.sh
   - cd package
 
-  - ls
-  
-  - ./butler validate virtualxt
-  - ./butler login
-  - ./butler push virtualxt phix/virtualxt:linux --userversion 0.0.1.$TRAVIS_BUILD_ID
+  - $TRAVIS_BUILD_DIR/butler validate virtualxt
+  - $TRAVIS_BUILD_DIR/butler login
+  - $TRAVIS_BUILD_DIR/butler push virtualxt phix/virtualxt:linux --userversion 0.0.1.$TRAVIS_BUILD_ID

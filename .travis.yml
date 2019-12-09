@@ -30,13 +30,15 @@ addons:
       - premake
 
 install:
+  - export PATH=$TRAVIS_BUILD_DIR:$PATH
+  
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-macosx.tar.gz/download && tar xvzf premake.tar.gz; fi
 
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then export BUTLER_PACKAGE=linux-amd64; else export BUTLER_PACKAGE=darwin-amd64; fi
   - curl -L -o butler.zip https://broth.itch.ovh/butler/${BUTLER_PACKAGE}/LATEST/archive/default && unzip butler.zip
 
-before_script: 
-  - ./premake4 gmake
+before_script:
+  - premake4 gmake
 
 script: 
   - make config=release
@@ -45,6 +47,6 @@ after_success:
   - ./tools/package/itch/package.sh
   - cd package
 
-  - $TRAVIS_BUILD_DIR/butler validate virtualxt
-  - $TRAVIS_BUILD_DIR/butler login
-  - $TRAVIS_BUILD_DIR/butler push virtualxt phix/virtualxt:$TRAVIS_OS_NAME --userversion 0.0.1.${TRAVIS_BUILD_ID}
+  - butler validate virtualxt
+  - butler login
+  - butler push virtualxt phix/virtualxt:$TRAVIS_OS_NAME --userversion 0.0.1.${TRAVIS_BUILD_ID}

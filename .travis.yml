@@ -23,13 +23,18 @@ addons:
     packages:
       - libsdl2-dev
       - premake4
-      
+
   homebrew:
     packages:
       - sdl2
       - premake
 
 install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-macosx.tar.gz/download; fi
+  - tar xvzf premake.tar.gz
+
+  - ls
+
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then export BUTLER_PACKAGE=linux-amd64; else export BUTLER_PACKAGE=darwin-amd64; fi
   - curl -L -o butler.zip https://broth.itch.ovh/butler/${BUTLER_PACKAGE}/LATEST/archive/default
   - unzip butler.zip

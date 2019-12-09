@@ -14,11 +14,10 @@ addons:
     packages:
       - libsdl2-dev
       - premake4
-      - 7z
 
 install:
   - curl -L -o butler.zip https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default
-  - 7z x butler.zip
+  - unzip butler.zip
 
 before_script: 
   - premake4 gmake

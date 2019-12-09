@@ -8,8 +8,8 @@
 #include "bios.bin.h"
 
 #include <time.h>
-#include <malloc.h>
 #include <memory.h>
+#include <stdlib.h>
 #include <stdio.h>
 
 // Emulator system constants

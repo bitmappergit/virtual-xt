@@ -37,7 +37,7 @@ solution 'VirtualXT'
         defines { '_CRT_SECURE_NO_WARNINGS' }
 
     configuration 'gmake'
-        buildoptions { '-fsigned-char -std=gnu99' }
+        buildoptions { '-fsigned-char -std=gnu99 -Wno-unused-result -fno-strict-aliasing' }
 
     project 'virtualxt'
         create_project 'ConsoleApp'

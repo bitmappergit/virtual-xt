@@ -10,9 +10,11 @@ addons:
     packages:
       - libsdl2-dev
       - premake4
+      - 7zip
 
-#install:
-#  - sudo apt-get install libsdl2-dev premake4
+install:
+  - curl -L -o butler.zip https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default
+  - 7z x butler.zip
 
 before_script: 
   - premake4 gmake
@@ -21,4 +23,9 @@ script:
   - make config=release
 
 after_success:
-  - echo Deploy!
+  - ./tools/package/itch/package.sh
+  - cd package
+  
+  - butler validate virtualxt
+  - butler login
+  - butler push virtualxt phix/virtualxt:linux --userversion 0.0.1.$TRAVIS_BUILD_ID

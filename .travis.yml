@@ -1,3 +1,7 @@
+os:
+  - linux
+  - osx
+
 dist: bionic
 
 language: c
@@ -9,6 +13,11 @@ branches:
   only:
     - master
 
+notifications:
+  email:
+    on_success: never
+    on_failure: always
+
 addons:
   apt:
     packages:
@@ -16,7 +25,8 @@ addons:
       - premake4
 
 install:
-  - curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then export BUTLER_PACKAGE=linux-amd64; else export BUTLER_PACKAGE=darwin-amd64; fi
+  - curl -L -o butler.zip https://broth.itch.ovh/butler/${BUTLER_PACKAGE}/LATEST/archive/default
   - unzip butler.zip
 
 before_script: 
@@ -31,4 +41,4 @@ after_success:
 
   - $TRAVIS_BUILD_DIR/butler validate virtualxt
   - $TRAVIS_BUILD_DIR/butler login
-  - $TRAVIS_BUILD_DIR/butler push virtualxt phix/virtualxt:linux --userversion 0.0.1.$TRAVIS_BUILD_ID
+  - $TRAVIS_BUILD_DIR/butler push virtualxt phix/virtualxt:$TRAVIS_OS_NAME --userversion 0.0.1.${TRAVIS_BUILD_ID}

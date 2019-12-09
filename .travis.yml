@@ -23,6 +23,11 @@ addons:
     packages:
       - libsdl2-dev
       - premake4
+      
+  homebrew:
+    packages:
+      - sdl2
+      - premake
 
 install:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then export BUTLER_PACKAGE=linux-amd64; else export BUTLER_PACKAGE=darwin-amd64; fi

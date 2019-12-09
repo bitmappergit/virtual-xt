@@ -5,12 +5,16 @@ language: c
 compiler:
   - gcc
 
+branches:
+  only:
+    - master
+
 addons:
   apt:
     packages:
       - libsdl2-dev
       - premake4
-      - 7zip
+      - 7z
 
 install:
   - curl -L -o butler.zip https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default

@@ -1,0 +1,24 @@
+dist: bionic
+
+language: c
+
+compiler:
+  - gcc
+
+addons:
+  apt:
+    packages:
+      - libsdl2-dev
+      - premake4
+
+#install:
+#  - sudo apt-get install libsdl2-dev premake4
+
+before_script: 
+  - premake4 gmake
+
+script: 
+  - make config=release
+
+after_success:
+  - echo Deploy!

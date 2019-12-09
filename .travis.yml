@@ -16,7 +16,7 @@ addons:
       - premake4
 
 install:
-  - curl -L -o butler.zip https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default
+  - curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
   - unzip butler.zip
 
 before_script: 
@@ -28,7 +28,9 @@ script:
 after_success:
   - ./tools/package/itch/package.sh
   - cd package
+
+  - ls
   
-  - butler validate virtualxt
-  - butler login
-  - butler push virtualxt phix/virtualxt:linux --userversion 0.0.1.$TRAVIS_BUILD_ID
+  - ./butler validate virtualxt
+  - ./butler login
+  - ./butler push virtualxt phix/virtualxt:linux --userversion 0.0.1.$TRAVIS_BUILD_ID

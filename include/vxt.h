@@ -64,6 +64,9 @@ extern "C" {
 
 #define VXT_MASK_KEY_UP 0x80
 
+typedef unsigned char byte;
+typedef unsigned short word;
+
 typedef enum {
     VXT_KEY_INVALID, // No key
     VXT_KEY_ESCAPE,
@@ -265,21 +268,21 @@ typedef struct {
 
     vxt_key_t (*getkey)(void*);
     void (*initialize)(void*,vxt_mode_t,int,int);
-    unsigned char *(*backbuffer)(void*); // Returns a RGB332 buffer with X*Y size
-    void (*textmode)(unsigned char*,unsigned char*,unsigned char,unsigned char,unsigned char);
+    byte *(*backbuffer)(void*); // Returns a RGB332 buffer with X*Y size
+    void (*textmode)(byte*,byte*,byte,byte,byte);
 } vxt_video_t;
 
 typedef struct {
     void *userdata;
 
-    int (*filter)(void*,unsigned short,int);
-    unsigned char (*in)(void*,unsigned short);
-    void (*out)(void*,unsigned short,unsigned char);
+    int (*filter)(void*,word,int);
+    byte (*in)(void*,word);
+    void (*out)(void*,word,byte);
 } vxt_port_map_t;
 
 typedef struct {
-    unsigned char modem;
-    unsigned char line;
+    byte modem;
+    byte line;
 } vxt_serial_status_t;
 
 typedef struct {
@@ -287,8 +290,8 @@ typedef struct {
 
     void (*init)(void*,int);
     vxt_serial_status_t (*status)(void*);
-    void (*send)(void*,unsigned char);
-    unsigned char (*receive)(void*);
+    void (*send)(void*,byte);
+    byte (*receive)(void*);
 } vxt_serial_t;
 
 typedef struct {
@@ -307,14 +310,13 @@ extern void vxt_replace_floppy(vxt_emulator_t *e, vxt_drive_t *fd);
 extern void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd);
 extern void vxt_set_port_map(vxt_emulator_t *e, vxt_port_map_t *map);
 extern void vxt_set_serial(vxt_emulator_t *e, int port, vxt_serial_t *com);
-extern void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac);
-extern void vxt_set_audio_silence(vxt_emulator_t *e, unsigned char s);
+extern void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac, byte silence);
 extern int vxt_blink(vxt_emulator_t *e);
 extern int vxt_step(vxt_emulator_t *e);
 extern void vxt_close(vxt_emulator_t *e);
 
 // Expects single channel, 44100Hz, unsigned bytes
-extern void vxt_audio_callback(vxt_emulator_t *e, unsigned char *stream, int len);
+extern void vxt_audio_callback(vxt_emulator_t *e, byte *stream, int len);
 
 #ifdef __cplusplus
 }

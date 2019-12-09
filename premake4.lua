@@ -28,6 +28,7 @@ solution 'VirtualXT'
 
     configuration 'Release'
         flags { 'Optimize' }
+        defines { 'NDEBUG' }
 
     configuration 'Debug'
         flags { 'Symbols' }

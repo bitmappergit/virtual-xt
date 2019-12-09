@@ -168,9 +168,9 @@ static vxt_key_t sdl_getkey(void *ud)
                 case SDLK_PRINTSCREEN: key.scancode |= VXT_KEY_PRINT; return key;
                 default: if (ev.key.keysym.sym >= 0x20 && ev.key.keysym.sym <= 0x7F) {
                     SDL_Keymod mod = ev.key.keysym.mod;
-                    if (mod & KMOD_RALT)
+                    if (mod & KMOD_RALT && ev.type == SDL_KEYDOWN)
                     {
-                        if (ev.key.keysym.sym)
+                        if (ev.key.keysym.sym == 'a')
                         {
                             replace_floppy();
                             return key;

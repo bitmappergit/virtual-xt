@@ -6,6 +6,7 @@
 #include "vxt.h"
 #include "kb.h"
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <time.h>
@@ -22,6 +23,9 @@
 	#ifdef main
 		#undef main
 	#endif
+#else
+	#include <fcntl.h>
+	#include <unistd.h>
 #endif
 
 #define VERSION_STRING "0.0.1"
@@ -56,9 +60,9 @@ SDL_AudioSpec sdl_audio = {44100, AUDIO_U8, 1, 0, 128};
 void replace_floppy()
 {
 	int f = -1;
-	char buf[256] = {0};
+	char buf[512] = {0};
 
-	#if defined(_WIN32) && !defined(NO_SDL)
+	#ifdef _WIN32
 		OPENFILENAME ofn;        
 		memset(&ofn, 0, sizeof(ofn));
 		ofn.lStructSize     = sizeof(ofn);
@@ -69,22 +73,26 @@ void replace_floppy()
 		ofn.Flags           = OFN_NONETWORKBUTTON|OFN_FILEMUSTEXIST|OFN_HIDEREADONLY;
 
 		if (!GetOpenFileName(&ofn)) return;
-		if ((f = open(buf, 32898)) == -1) { MessageBox(0, "Could not open image file!", "Alert!", MB_OK|MB_ICONEXCLAMATION); return; }
-		goto insert;
+	#else
+		// Check if zenity is installed.
+		if (system("which zenity > /dev/null 2>&1")) {
+			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing dependency", "Please install 'zenity', available at https://wiki.gnome.org/Projects/Zenity", NULL);
+			exit(-1);
+		}
+
+		FILE *fp = popen("zenity --file-selection --file-filter=*.img", "r");
+		if (fgets(buf, sizeof(buf), fp)) buf[strlen(buf)-1] = 0;
+		pclose(fp);
 	#endif
 
-	printf("\nFloppy image: ");
-	gets(buf);
-
-	if (strcmp(buf, ""))
-	{		
-		if ((f = open(buf, 32898)) == -1) { printf("Can't open floppy image!\n"); return; }
-		printf("Image mounted!\n");
+	if (*buf) {
+		if ((f = open(buf, 32898)) == -1) {
+			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing dependency", "Please install 'zenity', available at https://wiki.gnome.org/Projects/Zenity", NULL);
+			return;
+		}
+	} else {
+		return;
 	}
-	else
-		printf("Floppy image unmounted!\n");
-
-insert:
 
 	if (fd.userdata) close((int)(intptr_t)fd.userdata);
 	fd.userdata = (void*)(intptr_t)f;
@@ -129,6 +137,7 @@ static void open_window(void *ud, vxt_mode_t m, int x, int y)
 
 static unsigned char *video_buffer(void *ud)
 {
+	SDL_RenderClear(sdl_renderer);
 	SDL_UpdateTexture(sdl_texture, 0, sdl_surface->pixels, sdl_surface->pitch);
 	SDL_RenderCopy(sdl_renderer, sdl_texture, 0, 0);
 	SDL_RenderPresent(sdl_renderer);
@@ -261,9 +270,5 @@ int main(int argc, char *argv[])
 		replace_floppy();
 
 	while (vxt_step(e))
-	{
-		#ifndef NO_SDL
-			SDL_PumpEvents();
-		#endif
-	}
+		SDL_PumpEvents();
 }

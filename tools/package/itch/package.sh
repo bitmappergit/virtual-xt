@@ -12,3 +12,4 @@ cp tools/package/itch/unix.itch.toml $PACKAGE_DEST/.itch.toml
 # Copy libs
 cp /usr/lib/x86_64-linux-gnu/libSDL2-2.0.so.0 $PACKAGE_DEST
 cp /usr/lib/x86_64-linux-gnu/libsndio.so.6.1 $PACKAGE_DEST
+cp /usr/lib/x86_64-linux-gnu/libm.so.6 $PACKAGE_DEST

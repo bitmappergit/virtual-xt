@@ -38,7 +38,7 @@ solution 'VirtualXT'
 
     configuration 'gmake'
         buildoptions { '-fsigned-char -std=gnu99 -Wno-unused-result -fno-strict-aliasing' }
-        linkoptions { '-static' }
+        linkoptions { '-static-libgcc' }
 
 
     project 'virtualxt'

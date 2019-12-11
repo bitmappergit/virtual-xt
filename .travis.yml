@@ -44,8 +44,15 @@ matrix:
       os: windows
 
       before_install:
-        - curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-windows.zip/download && unzip premake.zip
+        - curl -L -o premake.zip http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-windows.zip/download && unzip premake.zip
         - curl -L -o butler.zip https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default && unzip butler.zip
+
+        - curl -L -o sdl.tar.gz https://www.libsdl.org/release/SDL2-devel-2.0.10-mingw.tar.gz
+        - 7z x sdl.tar.gz && 7z x sdl.tar
+
+        - dir C:\
+
+        #- xcopy SDL2-2.0.10\x86_64-w64-mingw32\* C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\x86_64-w64-mingw32 /e /d /y /h /r /c
 
       script:
         - make config=release

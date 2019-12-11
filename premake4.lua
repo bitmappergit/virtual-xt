@@ -38,7 +38,6 @@ solution 'VirtualXT'
 
     configuration 'gmake'
         buildoptions { '-fsigned-char -std=gnu99 -Wno-unused-result -fno-strict-aliasing' }
-        linkoptions { '-static-libgcc' }
 
     project 'virtualxt'
         create_project 'ConsoleApp'

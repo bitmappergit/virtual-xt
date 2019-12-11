@@ -2,7 +2,7 @@ os:
   - linux
   #- osx
 
-dist: bionic
+dist: xenial
 
 language: c
 
@@ -42,6 +42,9 @@ before_script:
 
 script: 
   - make config=release
+
+  - ls /usr/lib/x86_64-linux-gnu/libSDL2-2.0*
+  - ls /usr/lib/x86_64-linux-gnu/libsndio.so.*
 
 after_success:
   - ./tools/package/itch/package.sh

@@ -51,6 +51,7 @@ matrix:
         - 7z x sdl.tar.gz && 7z x sdl.tar
 
         - dir
+        - ls /c/tools
         - ls /c/tools/mingw64
 
         #- xcopy SDL2-2.0.10\x86_64-w64-mingw32\* C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\x86_64-w64-mingw32 /e /d /y /h /r /c

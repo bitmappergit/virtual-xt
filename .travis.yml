@@ -19,7 +19,8 @@ matrix:
       before_install:
         - curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default && unzip butler.zip
     
-      script: 
+      script:
+        - make config=release
         - ./tools/package/itch/package.sh
 
     ################ OSX Build ################
@@ -27,15 +28,17 @@ matrix:
     - name: OSX
       os: osx
 
-      homebrew:
-        packages:
-          - sdl2
+      addons:
+        homebrew:
+          packages:
+            - sdl2
 
       before_install:
         - curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-macosx.tar.gz/download && tar xvzf premake.tar.gz
         - curl -L -o butler.zip https://broth.itch.ovh/butler/darwin-amd64/LATEST/archive/default && unzip butler.zip
 
-      script: 
+      script:
+        - make config=release
         - ./tools/package/itch/package.sh
 
 ################ Common ################
@@ -56,7 +59,6 @@ install:
 
 before_script:
   - premake4 gmake
-  - make config=release
 
 after_success:
   - cd package

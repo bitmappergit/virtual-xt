@@ -7,9 +7,6 @@ matrix:
       os: linux
       dist: xenial
 
-      compiler:
-        - gcc
-
       addons:
         apt:
           packages:
@@ -44,6 +41,9 @@ matrix:
 ################ Common ################
 
 language: c
+
+compiler:
+  - gcc
 
 branches:
   only:

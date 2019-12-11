@@ -38,6 +38,19 @@ matrix:
         - make config=release
         - ./tools/package/itch/package.sh
 
+    ################ Windows Build ################
+
+    - name: Windows
+      os: windows
+
+      before_install:
+        - curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-macosx.tar.gz/download && tar xvzf premake.tar.gz
+        - curl -L -o butler.zip https://broth.itch.ovh/butler/darwin-amd64/LATEST/archive/default && unzip butler.zip
+
+      script:
+        - make config=release
+        - ./tools/package/itch/package.bat
+
 ################ Common ################
 
 language: c

@@ -1,13 +1,46 @@
-os:
-  - linux
-  #- osx
+matrix:
+  include:
 
-dist: xenial
+    ################ Linux Build ################
+
+    - name: Linux
+      os: linux
+      dist: xenial
+
+      compiler:
+        - gcc
+
+      addons:
+        apt:
+          packages:
+            - libsdl2-dev
+            - premake4
+
+      before_install:
+        - curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default && unzip butler.zip
+    
+      script: 
+        - ./tools/package/itch/package.sh
+
+    ################ OSX Build ################
+
+    - name: OSX
+      os: osx
+
+      homebrew:
+        packages:
+          - sdl2
+
+      before_install:
+        - curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-macosx.tar.gz/download && tar xvzf premake.tar.gz
+        - curl -L -o butler.zip https://broth.itch.ovh/butler/darwin-amd64/LATEST/archive/default && unzip butler.zip
+
+      script: 
+        - ./tools/package/itch/package.sh
+
+################ Common ################
 
 language: c
-
-compiler:
-  - gcc
 
 branches:
   only:
@@ -18,38 +51,15 @@ notifications:
     on_success: never
     on_failure: always
 
-addons:
-  apt:
-    packages:
-      - libsdl2-dev
-      - premake4
-
-  homebrew:
-    packages:
-      - sdl2
-      - premake
-
 install:
   - export PATH=$TRAVIS_BUILD_DIR:$PATH
-  
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-macosx.tar.gz/download && tar xvzf premake.tar.gz; fi
-
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then export BUTLER_PACKAGE=linux-amd64; else export BUTLER_PACKAGE=darwin-amd64; fi
-  - curl -L -o butler.zip https://broth.itch.ovh/butler/${BUTLER_PACKAGE}/LATEST/archive/default && unzip butler.zip
 
 before_script:
   - premake4 gmake
-
-script: 
   - make config=release
 
-  - ls /usr/lib/x86_64-linux-gnu/libSDL2-2.0*
-  - ls /usr/lib/x86_64-linux-gnu/libsndio.so.*
-
 after_success:
-  - ./tools/package/itch/package.sh
   - cd package
-
   - butler validate virtualxt
   - butler login
   - butler push virtualxt phix/virtualxt:$TRAVIS_OS_NAME --userversion 0.0.1.${TRAVIS_BUILD_ID}

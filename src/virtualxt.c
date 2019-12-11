@@ -355,11 +355,35 @@ int main(int argc, char *argv[])
 
 		vxt_set_audio_control(e, (vxt_pause_audio_t)SDL_PauseAudio, sdl_audio.silence);
 	}
+
+	SDL_Init(SDL_INIT_TIMER);
 	atexit(quit_sdl);
 
 	if (!fd_arg && !hd_arg)
 		replace_floppy();
 
-	while (vxt_step(e));
-		
+	const double mips = 20.33;
+
+	int ret = 1;
+	const Uint64 freq = SDL_GetPerformanceFrequency();
+	Uint64 last = SDL_GetPerformanceCounter();
+
+	for (int num_inst = 0; ret; num_inst++) {
+		Uint64 start = SDL_GetPerformanceCounter();
+		if ((start - last) / freq >= 1) {
+			printf("tick %d\n", num_inst);
+			last = start;
+			num_inst = 0;
+		}
+
+		ret = vxt_step(e);
+
+		for (;;) {
+			double ms = (double)((SDL_GetPerformanceCounter() - start) * 1000) / freq;
+			if (ms >= mips / 1000000.0) {
+				//printf("####### %f\n", t);
+				break;
+			}
+		}
+	}
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PACKAGE_DEST=package/virtualxt/VirtualXT.app
+PACKAGE_DEST=package/virtualxt
 mkdir -p $PACKAGE_DEST/VirtualXT.app/Contents/MacOS $PACKAGE_DEST/VirtualXT.app/Contents/Resources $PACKAGE_DEST/VirtualXT.app/Contents/Frameworks
 
 cp virtualxt $PACKAGE_DEST/VirtualXT.app/Contents/MacOS

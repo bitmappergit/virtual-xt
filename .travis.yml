@@ -52,9 +52,9 @@ matrix:
 
         - which gcc
         - ls /c/
-        - ls /c/ProgramData/chocolatey
-        - ls /c/ProgramData/chocolatey/lib
-        - ls /c/ProgramData/chocolatey/lib64
+        - ls /c/ProgramData/chocolatey/
+        - ls /c/ProgramData/chocolatey/lib/
+        - ls /c/ProgramData/chocolatey/lib64/
 
 
         # x86_64-posix-seh-rev0

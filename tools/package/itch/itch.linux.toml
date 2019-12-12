@@ -1,0 +1,12 @@
+[[actions]]
+name = "Boot FreeDOS"
+path = "virtualxt"
+args = ["-a", "freedos.img"]
+
+[[actions]]
+name = "Boot Floppy Image"
+path = "virtualxt"
+
+[[actions]]
+name = "manual"
+path = "manual/index.html"

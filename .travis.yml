@@ -18,7 +18,7 @@ matrix:
     
       script:
         - make config=release
-        - ./tools/package/itch/package.sh
+        - ./tools/package/itch/package.linux.sh
 
     ################ OSX Build ################
 
@@ -34,9 +34,12 @@ matrix:
         - curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-macosx.tar.gz/download && tar xvzf premake.tar.gz
         - curl -L -o butler.zip https://broth.itch.ovh/butler/darwin-amd64/LATEST/archive/default && unzip butler.zip
 
+        - curl -L -o sdl.dmg https://www.libsdl.org/release/SDL2-2.0.10.dmg && hdiutil attach sdl.dmg
+        - sudo cp -r /Volumes/SDL2/SDL2.framework /Library/Frameworks
+
       script:
         - make config=release
-        - ./tools/package/itch/package.sh
+        - ./tools/package/itch/package.osx.sh
 
     ################ Windows Build ################
 
@@ -50,11 +53,10 @@ matrix:
         - curl -L -o sdl.tar.gz https://www.libsdl.org/release/SDL2-devel-2.0.10-mingw.tar.gz
         - 7z x sdl.tar.gz && 7z x sdl.tar
 
-        - find -iname "gcc.exe"
-        - ls /c/tools
-        - ls /c/tools/mingw64
+        - export C_INCLUDE_PATH=${TRAVIS_BUILD_DIR}/SDL2-2.0.10/x86_64-w64-mingw32/include
+        - export LIBRARY_PATH=${TRAVIS_BUILD_DIR}/SDL2-2.0.10/x86_64-w64-mingw32/lib
 
-        #- xcopy SDL2-2.0.10\x86_64-w64-mingw32\* C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\x86_64-w64-mingw32 /e /d /y /h /r /c
+        - choco install make
 
       script:
         - make config=release
@@ -66,6 +68,9 @@ language: c
 
 compiler:
   - gcc
+
+env:
+  - VXT_VERSION=0.0.1
 
 branches:
   only:
@@ -86,4 +91,4 @@ after_success:
   - cd package
   - butler validate virtualxt
   - butler login
-  - butler push virtualxt phix/virtualxt:$TRAVIS_OS_NAME --userversion 0.0.1.${TRAVIS_BUILD_ID}
+  - butler push virtualxt phix/virtualxt:$TRAVIS_OS_NAME --userversion ${VXT_VERSION}.${TRAVIS_BUILD_ID}

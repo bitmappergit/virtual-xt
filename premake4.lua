@@ -3,6 +3,11 @@ for _,arg in ipairs(_ARGS) do
     else error('Unknown argument: ' .. arg) end
 end
 
+version = os.getenv('VXT_VERSION')
+if not version then
+    version = '0.0.1'
+end
+
 function create_project(k)
     kind(k)
     language 'C'
@@ -15,12 +20,60 @@ function create_project(k)
     if k == 'ConsoleApp' then
         files { 'src/virtualxt.c' }
         links { 'libvxt' }
-        links { 'SDL2' }
-        if os.is("windows") then links { 'comdlg32' } end
+        if os.is('macosx') then links { 'SDL2.framework' } else links { 'SDL2' } end
+        if os.is('windows') then links { 'comdlg32' } end
     else
         files { 'src/vxt.c' }
         targetname 'vxt'
     end
+end
+
+function write_version()
+    local fp = io.open('src/version.h', 'w')
+    fp:write(string.format('#define VERSION_STRING "%s"', version))
+    io.close(fp)
+end
+
+function create_app()
+    local plist = [[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>CFBundleDevelopmentRegion</key>
+        <string>English</string>
+        <key>CFBundleExecutable</key>
+        <string>start.sh</string>
+        <key>CFBundleGetInfoString</key>
+        <string>%s, Copyright © 2019 Andreas T Jonsson</string>
+        <key>CFBundleIconFile</key>
+        <string>icon.icns</string>
+        <key>CFBundleIdentifier</key>
+        <string>org.virtualxt.VirtualXT</string>
+        <key>CFBundleInfoDictionaryVersion</key>
+        <string>6.0</string>
+        <key>CFBundleName</key>
+        <string>VirtualXT</string>
+        <key>CFBundlePackageType</key>
+        <string>APPL</string>
+        <!-- <key>CFBundleShortVersionString</key><string>0.0</string> -->
+        <!-- <key>CFBundleSignature</key><string>????</string> -->
+        <key>CFBundleVersion</key>
+        <string>%s</string>
+        <key>NSHumanReadableCopyright</key>
+        <string>Copyright © 2019 Andreas T Jonsson, GNU General Public License.</string>
+        <key>LSMinimumSystemVersion</key>
+        <string>10.4</string>
+    </dict>
+</plist>]]
+
+    local fp = io.open('tools/package/itch/Info.plist', 'w')
+    fp:write(string.format(plist, version, version))
+    io.close(fp)
+end
+
+write_version()
+if os.is('macosx') then
+    create_app()
 end
 
 solution 'VirtualXT'

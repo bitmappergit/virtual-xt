@@ -5,6 +5,7 @@
 
 #include "vxt.h"
 #include "kb.h"
+#include "version.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -27,8 +28,6 @@
 	#include <fcntl.h>
 	#include <unistd.h>
 #endif
-
-#define VERSION_STRING "0.0.1"
 
 vxt_emulator_t *e = 0;
 vxt_drive_t fd = {0};

@@ -5,6 +5,7 @@
 // This work is licensed under the MIT License. See included LICENSE file.
 
 #include <vxt.h>
+#include "version.h"
 #include "bios.bin.h"
 
 #include <time.h>
@@ -334,6 +335,7 @@ void vxt_set_serial(vxt_emulator_t *e, int port, vxt_serial_t *com) { e->serial[
 void vxt_close(vxt_emulator_t *e) { if (e->mem_block) free(e->mem_block); }
 int vxt_blink(vxt_emulator_t *e) { return e->blink; }
 size_t vxt_memory_required() { return sizeof(vxt_emulator_t); }
+const char *vxt_version() { return VERSION_STRING; }
 
 int vxt_step(vxt_emulator_t *e)
 {

@@ -50,14 +50,10 @@ matrix:
         - curl -L -o sdl.tar.gz https://www.libsdl.org/release/SDL2-devel-2.0.10-mingw.tar.gz
         - 7z x sdl.tar.gz && 7z x sdl.tar
 
-        - which make
-
         - export C_INCLUDE_PATH=${TRAVIS_BUILD_DIR}/SDL2-2.0.10/x86_64-w64-mingw32/include
         - export LIBRARY_PATH=${TRAVIS_BUILD_DIR}/SDL2-2.0.10/x86_64-w64-mingw32/lib
 
-
-        # x86_64-posix-seh-rev0
-        #- xcopy SDL2-2.0.10\x86_64-w64-mingw32\* C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\x86_64-w64-mingw32 /e /d /y /h /r /c
+        - choco install make
 
       script:
         - make config=release

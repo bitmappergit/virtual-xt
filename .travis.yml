@@ -33,6 +33,7 @@ matrix:
       before_install:
         - curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-macosx.tar.gz/download && tar xvzf premake.tar.gz
         - curl -L -o butler.zip https://broth.itch.ovh/butler/darwin-amd64/LATEST/archive/default && unzip butler.zip
+        - curl -L -o sdl.dmg https://www.libsdl.org/release/SDL2-2.0.10.dmg && hdiutil attach sdl.dmg
 
       script:
         - make config=release
@@ -50,8 +51,8 @@ matrix:
         - curl -L -o sdl.tar.gz https://www.libsdl.org/release/SDL2-devel-2.0.10-mingw.tar.gz
         - 7z x sdl.tar.gz && 7z x sdl.tar
 
-        - export C_INCLUDE_PATH=${TRAVIS_BUILD_DIR}/SDL2-2.0.10/x86_64-w64-mingw32/include:$C_INCLUDE_PATH
-        - export LIBRARY_PATH=${TRAVIS_BUILD_DIR}/SDL2-2.0.10/x86_64-w64-mingw32/lib:$LIBRARY_PATH
+        - export C_INCLUDE_PATH=${TRAVIS_BUILD_DIR}/SDL2-2.0.10/x86_64-w64-mingw32/include
+        - export LIBRARY_PATH=${TRAVIS_BUILD_DIR}/SDL2-2.0.10/x86_64-w64-mingw32/lib
 
         - choco install make
 
@@ -65,6 +66,9 @@ language: c
 
 compiler:
   - gcc
+
+env:
+  - VXT_VERSION=0.0.1
 
 branches:
   only:
@@ -85,4 +89,4 @@ after_success:
   - cd package
   - butler validate virtualxt
   - butler login
-  - butler push virtualxt phix/virtualxt:$TRAVIS_OS_NAME --userversion 0.0.1.${TRAVIS_BUILD_ID}
+  - butler push virtualxt phix/virtualxt:$TRAVIS_OS_NAME --userversion ${VXT_VERSION}.${TRAVIS_BUILD_ID}

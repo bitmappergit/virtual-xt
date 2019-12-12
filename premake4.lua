@@ -15,7 +15,7 @@ function create_project(k)
     if k == 'ConsoleApp' then
         files { 'src/virtualxt.c' }
         links { 'libvxt' }
-        if os.is('macosx') links { 'SDL2.framework' } else links { 'SDL2' } end
+        if os.is('macosx') then links { 'SDL2.framework' } else links { 'SDL2' } end
         if os.is('windows') then links { 'comdlg32' } end
     else
         files { 'src/vxt.c' }

@@ -35,6 +35,12 @@ matrix:
         - curl -L -o butler.zip https://broth.itch.ovh/butler/darwin-amd64/LATEST/archive/default && unzip butler.zip
         - curl -L -o sdl.dmg https://www.libsdl.org/release/SDL2-2.0.10.dmg && hdiutil attach sdl.dmg
 
+
+
+        - ls /Volumes/SDL2
+
+        - cp /Volumes/SDL2/SDL2.framework /Library/Frameworks
+
       script:
         - make config=release
         - ./tools/package/itch/package.sh

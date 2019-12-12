@@ -50,11 +50,11 @@ matrix:
         - curl -L -o sdl.tar.gz https://www.libsdl.org/release/SDL2-devel-2.0.10-mingw.tar.gz
         - 7z x sdl.tar.gz && 7z x sdl.tar
 
-        - which gcc
-        - ls /c/
-        - ls /c/ProgramData/chocolatey/
-        - ls /c/ProgramData/chocolatey/lib/
-        - ls /c/ProgramData/chocolatey/lib64/
+        - echo $C_INCLUDE_PATH
+        - echo $LIBRARY_PATH
+
+        - export C_INCLUDE_PATH=${TRAVIS_BUILD_DIR}/SDL2-2.0.10/x86_64-w64-mingw32/include
+        - export LIBRARY_PATH=${TRAVIS_BUILD_DIR}/SDL2-2.0.10/x86_64-w64-mingw32/include
 
 
         # x86_64-posix-seh-rev0

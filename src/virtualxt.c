@@ -249,10 +249,7 @@ static vxt_key_t sdl_getkey(void *ud)
 						}
                     }
 
-                    int upper = mod & KMOD_CAPS;
-                    int shifted = (mod & KMOD_SHIFT) ? !upper : upper;
                     char ch = (char)ev.key.keysym.sym;
-
                     key.scancode |= ascii2scan[ch - 0x20];
                     key.ascii = ch;
                     return key;

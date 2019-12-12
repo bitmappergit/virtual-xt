@@ -85,6 +85,7 @@ struct vxt_emulator {
 	unsigned int pixel_colors[16], op_source, op_dest, rm_addr, op_to_addr, op_from_addr, i_data0, i_data1, i_data2, scratch_uint, scratch2_uint, set_flags_type, GRAPHICS_X, GRAPHICS_Y, vmem_ctr;
 	int op_result, scratch_int, blink;
 	void *mem_block;
+	vxt_drive_t *scratch_disk;
 	clock_t kb_timer, video_timer;
 	
 	byte video_mode;
@@ -161,7 +162,7 @@ const byte* const decode_lookup[20] = {
 					  e->i_d && (e->scratch_uint = e->op_from_addr, e->op_from_addr = e->rm_addr, e->op_to_addr = e->scratch_uint)
 
 // Return memory-mapped register location (offset into mem array) for register #reg_id
-#define GET_REG_ADDR(reg_id) (REGS_BASE + (e->i_w ? 2 * reg_id : 2 * reg_id + reg_id / 4 & 7))
+#define GET_REG_ADDR(reg_id) (REGS_BASE + (e->i_w ? 2 * reg_id : (2 * reg_id + reg_id / 4) & 7))
 
 // Returns number of top bit in operand (i.e. 8 for 8-bit operands, 16 for 16-bit operands)
 #define TOP_BIT 8*(e->i_w + 1)
@@ -179,7 +180,7 @@ const byte* const decode_lookup[20] = {
 #define DAA_DAS(op1,op2,mask,min) set_AF(e, (((e->scratch2_uint = e->regs8[REG_AL]) & 0x0F) > 9) || e->regs8[FLAG_AF]) && (e->op_result = e->regs8[REG_AL] op1 6, set_CF(e, e->regs8[FLAG_CF] || (e->regs8[REG_AL] op2 e->scratch2_uint))), \
 								  set_CF(e, (((mask & 1 ? e->scratch2_uint : e->regs8[REG_AL]) & mask) > min) || e->regs8[FLAG_CF]) && (e->op_result = e->regs8[REG_AL] op1 0x60)
 #define ADC_SBB_MACRO(a) OP(a##= e->regs8[FLAG_CF] +), \
-						 set_CF(e, e->regs8[FLAG_CF] && (e->op_result == e->op_dest) || (a e->op_result < a(int)e->op_dest)), \
+						 set_CF(e, (e->regs8[FLAG_CF] && (e->op_result == e->op_dest)) || (a e->op_result < a(int)e->op_dest)), \
 						 set_AF_OF_arith(e)
 
 // Execute arithmetic/logic operations in emulator memory/registers
@@ -339,8 +340,6 @@ const char *vxt_version() { return VERSION_STRING; }
 
 int vxt_step(vxt_emulator_t *e)
 {
-	vxt_drive_t *scratch_disk;
-
 	// We have no boot media!
 	if (!e->disk[0] && !e->disk[1]) return 0;
 
@@ -602,7 +601,7 @@ int vxt_step(vxt_emulator_t *e)
 				{
 					MEM_OP(e->extra ? REGS_BASE : SEGREG(e->scratch2_uint, REG_SI,), -, SEGREG(REG_ES, REG_DI,)),
 					e->extra || INDEX_INC(REG_SI),
-					INDEX_INC(REG_DI), e->rep_override_en && !(--e->regs16[REG_CX] && (!e->op_result == e->rep_mode)) && (e->scratch_uint = 0);
+					INDEX_INC(REG_DI), e->rep_override_en && !(--e->regs16[REG_CX] && ((!e->op_result) == e->rep_mode)) && (e->scratch_uint = 0);
 				}
 
 				e->set_flags_type = FLAGS_UPDATE_SZP | FLAGS_UPDATE_AO_ARITH; // Funge to set SZP/AO flags
@@ -698,7 +697,7 @@ int vxt_step(vxt_emulator_t *e)
 				pc_interrupt(e, 0)
 		OPCODE 42: // AAD
 			e->i_w = 0;
-			e->regs16[REG_AX] = e->op_result = 0xFF & e->regs8[REG_AL] + e->i_data0 * e->regs8[REG_AH]
+			e->regs16[REG_AX] = e->op_result = 0xFF & (e->regs8[REG_AL] + e->i_data0 * e->regs8[REG_AH])
 		OPCODE 43: // SALC
 			e->regs8[REG_AL] = -e->regs8[FLAG_CF]
 		OPCODE 44: // XLAT
@@ -722,9 +721,9 @@ int vxt_step(vxt_emulator_t *e)
 				OPCODE_CHAIN 3: // DISK_WRITE
 					if (e->disk[e->regs8[REG_DL]])
 					{
-						scratch_disk = e->disk[e->regs8[REG_DL]];
-						e->regs8[REG_AL] = ~scratch_disk->seek(scratch_disk->userdata, CAST(unsigned)e->regs16[REG_BP] << 9, 0)
-							? ((char)e->i_data0 == 3 ? (int(*)())scratch_disk->write : (int(*)())scratch_disk->read)(scratch_disk->userdata, e->mem + SEGREG(REG_ES, REG_BX,), e->regs16[REG_AX])
+						e->scratch_disk = e->disk[e->regs8[REG_DL]];
+						e->regs8[REG_AL] = ~e->scratch_disk->seek(e->scratch_disk->userdata, CAST(unsigned)e->regs16[REG_BP] << 9, 0)
+							? ((char)e->i_data0 == 3 ? (int(*)())e->scratch_disk->write : (int(*)())e->scratch_disk->read)(e->scratch_disk->userdata, e->mem + SEGREG(REG_ES, REG_BX,), e->regs16[REG_AX])
 							: 0;
 					} else e->regs8[REG_AL] = 0;
 				OPCODE 4: // SERIAL_COM

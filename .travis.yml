@@ -18,7 +18,7 @@ matrix:
     
       script:
         - make config=release
-        - ./tools/package/itch/package.sh
+        - ./tools/package/itch/package.linux.sh
 
     ################ OSX Build ################
 
@@ -39,7 +39,7 @@ matrix:
 
       script:
         - make config=release
-        - ./tools/package/itch/package.sh
+        - ./tools/package/itch/package.osx.sh
 
     ################ Windows Build ################
 

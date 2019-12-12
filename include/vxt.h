@@ -305,6 +305,7 @@ typedef struct {
 
 extern vxt_emulator_t *vxt_open(vxt_video_t *video, vxt_clock_t *clock, void *mem);
 extern size_t vxt_memory_required();
+extern const char *vxt_version();
 extern void vxt_load_bios(vxt_emulator_t *e, const void *data, size_t sz);
 extern void vxt_replace_floppy(vxt_emulator_t *e, vxt_drive_t *fd);
 extern void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd);

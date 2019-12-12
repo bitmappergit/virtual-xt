@@ -1,11 +1,11 @@
 [[actions]]
 name = "Boot FreeDOS"
-path = "start.sh"
+path = "virtualxt"
 args = ["-a", "freedos.img"]
 
 [[actions]]
 name = "Boot Floppy Image"
-path = "start.sh"
+path = "virtualxt"
 
 [[actions]]
 name = "manual"

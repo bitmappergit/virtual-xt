@@ -51,6 +51,7 @@ const int text_color[] = {
 	0xFFFFFF
 };
 
+char title_buffer[64] = {0};
 SDL_Window *sdl_window = 0;
 SDL_Surface *sdl_surface = 0;
 SDL_Texture *sdl_texture = 0;
@@ -123,13 +124,12 @@ static void open_window(void *ud, vxt_mode_t m, int x, int y)
 
 	int h = (int)((float)x / (4.f / 3.f));
 	SDL_RenderSetLogicalSize(sdl_renderer, x, h);
+	SDL_SetWindowTitle(sdl_window, "VirtualXT");
 
 	if (m == VXT_TEXT) {
-		SDL_SetWindowTitle(sdl_window, "VirtualXT");
 		sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING, x, y);	
 		sdl_surface = SDL_CreateRGBSurface(0, x, y, 32, 0, 0, 0, 0);
 	} else {
-		SDL_SetWindowTitle(sdl_window, m == VXT_CGA ? "VirtualXT (CGA)" : "VirtualXT (Hercules)");
 		sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_RGB332, SDL_TEXTUREACCESS_STREAMING, x, y);	
 		sdl_surface = SDL_CreateRGBSurface(0, x, y, 8, 0xE0, 0x1C, 0x3, 0x0);
 	}
@@ -290,13 +290,16 @@ int main(int argc, char *argv[])
 	#endif
 
 	int hdboot_arg = 0, noaudio_arg = 0;
+	double mips_arg = 0.0;
 	const char *fd_arg = 0, *hd_arg = 0, *bios_arg = 0;
+
 	while (--argc && ++argv) {
 		if (!strcmp(*argv, "-h")) { print_help(); return 0; }
 		if (!strcmp(*argv, "-m")) { open_manual(); return 0; }
 		if (!strcmp(*argv, "-v")) { printf(VERSION_STRING "\n"); return 0; }
 		if (!strcmp(*argv, "-a")) { fd_arg = argc-- ? *(++argv) : fd_arg; continue; }
 		if (!strcmp(*argv, "-c")) { hd_arg = argc-- ? *(++argv) : hd_arg; continue; }
+		if (!strcmp(*argv, "--mips")) { mips_arg = argc-- ? atof(*(++argv)) : mips_arg; continue; }
 		if (!strcmp(*argv, "--hdboot")) { hdboot_arg = 1; continue; }
 		if (!strcmp(*argv, "--noaudio")) { noaudio_arg = 1; continue; }
 		if (!strcmp(*argv, "--bios")) { bios_arg = argc-- ? *(++argv) : bios_arg; continue; }
@@ -361,28 +364,26 @@ int main(int argc, char *argv[])
 	if (!fd_arg && !hd_arg)
 		replace_floppy();
 
-	const double mips = 20.33;
-
-	int ret = 1;
+	const double it = 1000.0 / (mips_arg * 1000.0);
 	const Uint64 freq = SDL_GetPerformanceFrequency();
 	Uint64 last = SDL_GetPerformanceCounter();
 
-	for (int num_inst = 0; ret; num_inst++) {
+	for (int num_inst = 0;; num_inst++) {
 		Uint64 start = SDL_GetPerformanceCounter();
 		if ((start - last) / freq >= 1) {
-			printf("tick %d\n", num_inst);
+			sprintf(title_buffer, "VirtualXT @ %.2f MIPS", (double)num_inst / 1000000.0);
+			SDL_SetWindowTitle(sdl_window, title_buffer);
 			last = start;
 			num_inst = 0;
 		}
 
-		ret = vxt_step(e);
+		if (!vxt_step(e))
+			break;
 
-		for (;;) {
-			double ms = (double)((SDL_GetPerformanceCounter() - start) * 1000) / freq;
-			if (ms >= mips / 1000000.0) {
-				//printf("####### %f\n", t);
+		while (mips_arg) {
+			double t = (double)((SDL_GetPerformanceCounter() - start) * 1000000) / freq;
+			if (t >= it)
 				break;
-			}
 		}
 	}
 }

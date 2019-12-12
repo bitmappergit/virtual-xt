@@ -50,7 +50,7 @@ matrix:
         - curl -L -o sdl.tar.gz https://www.libsdl.org/release/SDL2-devel-2.0.10-mingw.tar.gz
         - 7z x sdl.tar.gz && 7z x sdl.tar
 
-        - find -iname "gcc.exe"
+        - find -iname gcc
         - ls /c/tools
         - ls /c/tools/mingw64
 

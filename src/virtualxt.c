@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <sys/timeb.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 
 #ifdef _WIN32

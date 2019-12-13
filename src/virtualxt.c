@@ -15,7 +15,7 @@
 #include <sys/timeb.h>
 #include <fcntl.h>
 
-#ifdef _WIN32
+#if defined(_WIN32)
 	#include <windows.h>
 	#include <io.h>
 
@@ -29,6 +29,8 @@
 	#else
 		#include <SDL.h>
 	#endif
+#elif defined(__APPLE__) && defined(__MACH__)
+	#include <nfd.h>
 #else
 	#include <unistd.h>
 	#include <SDL2/SDL.h>
@@ -76,7 +78,7 @@ static void replace_floppy()
 	int f = -1;
 	char buf[512] = {0};
 
-	#ifdef _WIN32
+	#if defined(_WIN32)
 		OPENFILENAME ofn;        
 		memset(&ofn, 0, sizeof(ofn));
 		ofn.lStructSize     = sizeof(ofn);
@@ -87,6 +89,11 @@ static void replace_floppy()
 		ofn.Flags           = OFN_NONETWORKBUTTON|OFN_FILEMUSTEXIST|OFN_HIDEREADONLY;
 
 		if (!GetOpenFileName(&ofn)) return;
+	#elif defined(__APPLE__) && defined(__MACH__)
+		nfdchar_t *path = NULL;
+		if (NFD_OpenDialog("*.img", NULL, &path) != NFD_OKAY) return;
+		strcpy(buf, path);
+		free(path);
 	#else
 		// Check if zenity is installed.
 		if (system("which zenity > /dev/null 2>&1")) {

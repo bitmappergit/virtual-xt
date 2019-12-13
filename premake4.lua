@@ -12,16 +12,29 @@ function create_project(k)
     kind(k)
     language 'C'
     targetdir ''
-    platforms { 'native', 'x32', 'x64' }
     includedirs { 'include' }
-
     if wall then flags { 'ExtraWarnings'} end
 
+    if os.is('macosx') then
+        platforms { 'native', 'x64' }
+    else
+        platforms { 'native', 'x32', 'x64' }
+    end
+    
     if k == 'ConsoleApp' then
         files { 'src/virtualxt.c' }
         links { 'libvxt' }
-        if os.is('macosx') then links { 'SDL2.framework' } else links { 'SDL2' } end
-        if os.is('windows') then links { 'comdlg32' } end
+
+        if os.is('windows') then
+            links { 'comdlg32' }
+            links { 'SDL2' }
+        elseif os.is('macosx') then
+            links { 'Foundation.framework', 'AppKit.framework', 'SDL2.framework' }
+            files { 'src/nfd_osx/nfd_common.c', 'src/nfd_osx/nfd_cocoa.m' }
+            includedirs { 'src/nfd_osx' }
+        else
+            links { 'SDL2' }
+        end
     else
         files { 'src/vxt.c' }
         targetname 'vxt'

@@ -29,6 +29,7 @@ matrix:
         homebrew:
           packages:
             - sdl2
+            - git-lfs
 
       before_install:
         - curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-macosx.tar.gz/download && tar xvzf premake.tar.gz

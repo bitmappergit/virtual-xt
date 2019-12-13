@@ -81,7 +81,7 @@ static void replace_floppy()
 			exit(-1);
 		}
 
-		FILE *fp = popen("zenity --file-selection --file-filter=*.img", "r");
+		FILE *fp = popen("zenity --file-selection --title=\"Select Floppy Image\" --file-filter=*.img", "r");
 		if (fgets(buf, sizeof(buf), fp)) buf[strlen(buf)-1] = 0;
 		pclose(fp);
 	#endif

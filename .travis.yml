@@ -83,6 +83,7 @@ notifications:
 
 install:
   - export PATH=$TRAVIS_BUILD_DIR:$PATH
+  - git lfs pull
 
 before_script:
   - premake4 gmake

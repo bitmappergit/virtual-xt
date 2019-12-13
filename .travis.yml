@@ -25,11 +25,11 @@ matrix:
     - name: OSX
       os: osx
 
-      addons:
-        homebrew:
-          packages:
-            - sdl2
-            - git-lfs
+      #addons:
+      #  homebrew:
+      #    packages:
+      #      - sdl2
+      #      - git-lfs
 
       before_install:
         - curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-macosx.tar.gz/download && tar xvzf premake.tar.gz
@@ -37,6 +37,9 @@ matrix:
 
         - curl -L -o sdl.dmg https://www.libsdl.org/release/SDL2-2.0.10.dmg && hdiutil attach sdl.dmg
         - sudo cp -r /Volumes/SDL2/SDL2.framework /Library/Frameworks
+
+        - brew update
+        - brew install sdl2 git-lfs
 
       script:
         - make config=release

@@ -13,25 +13,27 @@
 #include <stdint.h>
 #include <time.h>
 #include <sys/timeb.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 
 #ifdef _WIN32
 	#include <windows.h>
 	#include <io.h>
 
-	#ifdef _MSC_VER
-		#include <SDL.h>
-	#else
+	#ifdef __MINGW32__
 		#include <SDL2/SDL.h>
 
 		// This is an issue with the MinGW. /aj
 		#ifdef main
 			#undef main
 		#endif
+	#else
+		#include <SDL.h>
 	#endif
 #else
 	#include <unistd.h>
+	#include <sys/types.h>
+	#include <sys/stat.h>
+
 	#include <SDL2/SDL.h>
 #endif
 

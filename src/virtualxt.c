@@ -92,7 +92,7 @@ static void replace_floppy()
 	#elif defined(__APPLE__) && defined(__MACH__)
 		nfdchar_t *path = NULL;
 		if (NFD_OpenDialog("*.img", NULL, &path) != NFD_OKAY) return;
-		strcpy(buf, path);
+		strncpy(buf, path, sizeof(buf));
 		free(path);
 	#else
 		// Check if zenity is installed.

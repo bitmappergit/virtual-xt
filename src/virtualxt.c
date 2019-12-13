@@ -31,10 +31,15 @@
 	#endif
 #else
 	#include <unistd.h>
-	#include <sys/types.h>
-	#include <sys/stat.h>
-
 	#include <SDL2/SDL.h>
+#endif
+
+// Missing on some systems.
+#ifndef O_BINARY
+	#define O_BINARY 0
+#endif
+#ifndef O_NOINHERIT
+	#define O_NOINHERIT 0
 #endif
 
 vxt_emulator_t *e = 0;

@@ -7,12 +7,14 @@
 #include "kb.h"
 #include "version.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <time.h>
 #include <sys/timeb.h>
-#include <assert.h>
+#include <fcntl.h>
 
 #include <SDL2/SDL.h>
 
@@ -24,9 +26,6 @@
 	#ifdef main
 		#undef main
 	#endif
-#else
-	#include <fcntl.h>
-	#include <unistd.h>
 #endif
 
 vxt_emulator_t *e = 0;
@@ -87,7 +86,7 @@ static void replace_floppy()
 	#endif
 
 	if (*buf) {
-		if ((f = open(buf, 32898)) == -1) {
+		if ((f = open(buf, O_RDWR|O_BINARY|O_NOINHERIT)) == -1) {
 			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing dependency", "Please install 'zenity', available at https://wiki.gnome.org/Projects/Zenity", NULL);
 			return;
 		}
@@ -318,7 +317,7 @@ int main(int argc, char *argv[])
 
 	if (fd_arg)
 	{
-		int f = open(fd_arg, 32898);
+		int f = open(fd_arg, O_RDWR|O_BINARY|O_NOINHERIT);
 		if (f == -1) { printf("Can't open FD image: %s\n", fd_arg); return -1; }
 		fd.userdata = (void*)(intptr_t)f,
 		vxt_replace_floppy(e, &fd);
@@ -326,7 +325,7 @@ int main(int argc, char *argv[])
 
 	if (hd_arg)
 	{
-		int f = open(hd_arg, 32898);
+		int f = open(hd_arg, O_RDWR|O_BINARY|O_NOINHERIT);
 		if (f == -1) { printf("Can't open HD image: %s\n", hd_arg); return -1; }
 		hd.userdata = (void*)(intptr_t)f,
 		hd.boot = hdboot_arg;

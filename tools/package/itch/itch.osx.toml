@@ -9,4 +9,4 @@ path = "VirtualXT.app"
 
 [[actions]]
 name = "manual"
-path = "VirtualXT.app/manual/index.html"
+path = "VirtualXT.app/Contents/MacOS/manual/index.html"

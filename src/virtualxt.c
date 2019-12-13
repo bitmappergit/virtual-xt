@@ -11,21 +11,27 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <unistd.h>
 #include <time.h>
 #include <sys/timeb.h>
 #include <fcntl.h>
-
-#include <SDL2/SDL.h>
 
 #ifdef _WIN32
 	#include <windows.h>
 	#include <io.h>
 
-	// This is an issue with the MinGW. /aj
-	#ifdef main
-		#undef main
+	#ifdef _MSC_VER
+		#include <SDL.h>
+	#else
+		#include <SDL2/SDL.h>
+
+		// This is an issue with the MinGW. /aj
+		#ifdef main
+			#undef main
+		#endif
 	#endif
+#else
+	#include <unistd.h>
+	#include <SDL2/SDL.h>
 #endif
 
 vxt_emulator_t *e = 0;

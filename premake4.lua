@@ -88,6 +88,7 @@ solution 'VirtualXT'
 
     configuration 'vs*'
         defines { '_CRT_SECURE_NO_WARNINGS' }
+        links { 'SDL2main' }
 
     configuration 'gmake'
         buildoptions { '-fsigned-char -std=gnu99 -Wno-unused-result -Wno-unused-value -fno-strict-aliasing' }

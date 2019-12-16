@@ -15,25 +15,24 @@
 #include <sys/timeb.h>
 #include <fcntl.h>
 
+#if defined(_WIN32) && !defined(__MINGW32__)
+	#include <SDL.h>
+#else
+	#include <SDL2/SDL.h>
+#endif
+
 #if defined(_WIN32)
 	#include <windows.h>
 	#include <io.h>
 
-	#ifdef __MINGW32__
-		#include <SDL2/SDL.h>
-
-		// This is an issue with the MinGW. /aj
-		#ifdef main
-			#undef main
-		#endif
-	#else
-		#include <SDL.h>
+	// This is an issue with the MinGW. /aj
+	#if defined(__MINGW32__) && defined(main)
+		#undef main
 	#endif
 #elif defined(__APPLE__) && defined(__MACH__)
 	#include <nfd.h>
 #else
 	#include <unistd.h>
-	#include <SDL2/SDL.h>
 #endif
 
 // Missing on some systems.

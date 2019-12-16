@@ -28,7 +28,6 @@ matrix:
       #addons:
       #  homebrew:
       #    packages:
-      #      - sdl2
       #      - git-lfs
 
       before_install:
@@ -38,8 +37,9 @@ matrix:
         - curl -L -o sdl.dmg https://www.libsdl.org/release/SDL2-2.0.10.dmg && hdiutil attach sdl.dmg
         - sudo cp -r /Volumes/SDL2/SDL2.framework /Library/Frameworks
 
+        # Homebrew addon dosn't seem to work. Run it manually!
         - brew update
-        - brew install sdl2 git-lfs
+        - brew install git-lfs
 
       script:
         - make config=release

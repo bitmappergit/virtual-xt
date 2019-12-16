@@ -8,6 +8,8 @@ if not version then
     version = '0.0.1'
 end
 
+sdl2_path = os.getenv('SDL2')
+
 function create_project(k)
     kind(k)
     language 'C'
@@ -30,8 +32,8 @@ function create_project(k)
             links { 'SDL2' }
         elseif os.is('macosx') then
             links { 'Foundation.framework', 'AppKit.framework', 'SDL2.framework' }
-            files { 'src/nfd_osx/nfd_common.c', 'src/nfd_osx/nfd_cocoa.m' }
-            includedirs { 'src/nfd_osx' }
+            files { 'src/nfd/nfd_common.c', 'src/nfd/nfd_cocoa.m' }
+            includedirs { 'src/nfd' }
         else
             links { 'SDL2' }
         end
@@ -102,6 +104,11 @@ solution 'VirtualXT'
     configuration 'vs*'
         defines { '_CRT_SECURE_NO_WARNINGS' }
         links { 'SDL2main' }
+        
+        if sdl2_path then
+            includedirs { sdl2_path .. '/include' }
+            libdirs { sdl2_path .. '/lib/x64' }
+        end
 
     configuration 'gmake'
         buildoptions { '-fsigned-char -std=gnu99 -Wno-unused-result -Wno-unused-value -fno-strict-aliasing' }

@@ -46,6 +46,7 @@
 
 vxt_emulator_t *e = 0;
 vxt_drive_t fd = {0};
+vxt_key_t auto_release = {0};
 
 const int text_color[] = {
 	0x000000,
@@ -145,6 +146,7 @@ static void open_window(void *ud, vxt_mode_t m, int x, int y)
 	int h = (int)((float)x / (4.f / 3.f));
 	SDL_RenderSetLogicalSize(sdl_renderer, x, h);
 	SDL_SetWindowTitle(sdl_window, "VirtualXT");
+	SDL_StartTextInput();
 
 	if (m == VXT_TEXT) {
 		sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING, x, y);	
@@ -211,16 +213,48 @@ static void textmode(unsigned char *mem, byte *font, byte cursor, byte cx, byte 
 static vxt_key_t sdl_getkey(void *ud)
 {
 	vxt_key_t key = {.scancode = VXT_KEY_INVALID, .ascii = 0};
+	if (auto_release.scancode != VXT_KEY_INVALID)
+	{
+		key = auto_release;
+		auto_release.scancode = VXT_KEY_INVALID; auto_release.ascii = 0;
+		return key;
+	}
+	
 	if (sdl_window)
 	{
 		SDL_Event ev;
 		while (SDL_PollEvent(&ev))
 		{
-            if (ev.type == SDL_QUIT) exit(0);
-			if (ev.type != SDL_KEYDOWN && ev.type != SDL_KEYUP) continue;
-            key.scancode = ev.type == SDL_KEYDOWN ? 0 : VXT_MASK_KEY_UP;
+            if (ev.type == SDL_QUIT)
+				exit(0);
 
-            switch (ev.key.keysym.sym)
+			if (ev.type == SDL_TEXTINPUT)
+			{
+				char ch = *ev.text.text;
+				key.scancode = ascii2scan[ch - 0x20];
+				key.ascii = *ev.text.text;
+
+				auto_release = key;
+				auto_release.scancode |= VXT_MASK_KEY_UP;
+
+				// Reset any buffers
+				SDL_StopTextInput();
+				SDL_StartTextInput();
+				return key;
+			}
+
+			if (ev.type == SDL_KEYDOWN) {
+				key.scancode = VXT_KEY_INVALID;
+				if (ev.key.keysym.sym == SDLK_RALT) SDL_StopTextInput();
+			} else if (ev.type == SDL_KEYUP) {
+				key.scancode = VXT_MASK_KEY_UP;
+				if (ev.key.keysym.sym == SDLK_RALT && !ev.key.repeat) SDL_StartTextInput();
+			} else {
+				continue;
+			}
+
+			SDL_Keycode sym = ev.key.keysym.sym;
+            switch (sym)
             {
                 case SDLK_ESCAPE: key.ascii = 0x1B; key.scancode |= VXT_KEY_ESCAPE; return key;
                 case SDLK_RETURN: key.ascii = '\r'; key.scancode |= VXT_KEY_ENTER; return key;
@@ -253,28 +287,16 @@ static vxt_key_t sdl_getkey(void *ud)
                 case SDLK_F8: key.scancode |= VXT_KEY_F8; return key;
                 case SDLK_F9: key.scancode |= VXT_KEY_F9; return key;
                 case SDLK_F10: key.scancode |= VXT_KEY_F10; return key;
-                default: if (ev.key.keysym.sym >= 0x20 && ev.key.keysym.sym <= 0x7F) {
-                    SDL_Keymod mod = ev.key.keysym.mod;
-                    if (mod & KMOD_RALT && ev.type == SDL_KEYDOWN)
-                    {
-                        switch (ev.key.keysym.sym) {
-							case 'q':
-								exit(0);
-							case 'a':
-								replace_floppy();
-								continue;
-							case 'f':
-								SDL_SetWindowFullscreen(sdl_window, SDL_GetWindowFlags(sdl_window) & (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
-								continue;
-						}
-                    }
 
-                    char ch = (char)ev.key.keysym.sym;
-                    key.scancode |= ascii2scan[ch - 0x20];
-                    key.ascii = ch;
-                    return key;
-                }
-            }
+				default: // Special operations
+
+					if (ev.type == SDL_KEYDOWN && ev.key.keysym.mod & KMOD_RALT) switch (sym)
+					{
+						case 'q': exit(0);
+						case 'a': replace_floppy(); continue;
+						case 'f': SDL_SetWindowFullscreen(sdl_window, SDL_GetWindowFlags(sdl_window) & (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP); continue;
+					}
+			}
 		}
 	}
 	return key;
@@ -395,7 +417,7 @@ int main(int argc, char *argv[])
 		}
 
 		if (!vxt_step(e))
-			break;
+			return 0;
 
 		while (mips_arg) {
 			double t = (double)((SDL_GetPerformanceCounter() - start) * 1000000) / freq;

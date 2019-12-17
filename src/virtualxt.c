@@ -66,6 +66,9 @@ const int text_color[] = {
 	0xFFFFFF
 };
 
+const char *scale_filter = "0";
+const char *video_driver = "opengl";
+
 char title_buffer[64] = {0};
 SDL_Window *sdl_window = 0;
 SDL_Surface *sdl_surface = 0;
@@ -134,12 +137,15 @@ static void open_window(void *ud, vxt_mode_t m, int x, int y)
 		SDL_FreeSurface(sdl_surface); sdl_surface = 0;
 		SDL_DestroyTexture(sdl_texture); sdl_texture = 0;
 	} else {
-		SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
-		SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
 		SDL_SetHint(SDL_HINT_WINDOWS_NO_CLOSE_ON_ALT_F4, "1");
+		SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, scale_filter);
+		if (video_driver) SDL_SetHint(SDL_HINT_RENDER_DRIVER, video_driver);
 
 		SDL_Init(SDL_INIT_VIDEO);
-		SDL_CreateWindowAndRenderer(640, 480, SDL_WINDOW_RESIZABLE|SDL_WINDOW_INPUT_FOCUS|SDL_WINDOW_MOUSE_FOCUS, &sdl_window, &sdl_renderer);
+		if (SDL_CreateWindowAndRenderer(640, 480, SDL_WINDOW_RESIZABLE|SDL_WINDOW_INPUT_FOCUS|SDL_WINDOW_MOUSE_FOCUS, &sdl_window, &sdl_renderer)) {
+			printf("%s\n", SDL_GetError());
+			exit(-1);
+		}
 	}
 
 	int h = (int)((float)x / (4.f / 3.f));
@@ -209,6 +215,17 @@ static void textmode(unsigned char *mem, byte *font, byte cursor, byte cx, byte 
 	SDL_RenderPresent(sdl_renderer);
 }
 
+static void open_manual()
+{
+	#if defined(_WIN32)
+		system("cmd /c manual\\index.html");
+	#elif defined(__APPLE__) && defined(__MACH__)
+		system("open manual\\index.html");
+	#else
+		system("xdg-open manual\\index.html");
+	#endif
+}
+
 static vxt_key_t sdl_getkey(void *ud)
 {
 	vxt_key_t key = {.scancode = VXT_KEY_INVALID, .ascii = 0};
@@ -224,6 +241,9 @@ static vxt_key_t sdl_getkey(void *ud)
 		SDL_Event ev;
 		while (SDL_PollEvent(&ev))
 		{
+			key.ascii = 0;
+			key.scancode = VXT_KEY_INVALID;
+
             if (ev.type == SDL_QUIT)
 				exit(0);
 
@@ -253,29 +273,44 @@ static vxt_key_t sdl_getkey(void *ud)
 			}
 
 			SDL_Keycode sym = ev.key.keysym.sym;
+			if (ev.key.keysym.mod & KMOD_NUM == 0) switch (sym)
+            {
+                case SDLK_KP_0: key.scancode |= VXT_KEY_KP_INSERT_0; return key;
+				case SDLK_KP_1: key.scancode |= VXT_KEY_KP_END_1; return key;
+				case SDLK_KP_2: key.scancode |= VXT_KEY_KP_DOWN_2; return key;
+				case SDLK_KP_3: key.scancode |= VXT_KEY_KP_PAGEDOWN_3; return key;
+				case SDLK_KP_4: key.scancode |= VXT_KEY_KP_LEFT_4; return key;
+				case SDLK_KP_6: key.scancode |= VXT_KEY_KP_RIGHT_6; return key;
+				case SDLK_KP_7: key.scancode |= VXT_KEY_KP_HOME_7; return key;
+				case SDLK_KP_8: key.scancode |= VXT_KEY_KP_UP_8; return key;
+                case SDLK_KP_9: key.scancode |= VXT_KEY_KP_PAGEUP_9; return key;
+			}
+
             switch (sym)
             {
                 case SDLK_ESCAPE: key.ascii = 0x1B; key.scancode |= VXT_KEY_ESCAPE; return key;
                 case SDLK_RETURN: key.ascii = '\r'; key.scancode |= VXT_KEY_ENTER; return key;
                 case SDLK_BACKSPACE: key.ascii = '\b'; key.scancode |= VXT_KEY_BACKSPACE; return key;
                 case SDLK_TAB: key.ascii = '\t'; key.scancode |= VXT_KEY_TAB; return key;
-                case SDLK_UP: case SDLK_KP_8: key.scancode |= VXT_KEY_KP_UP_8; return key;
-                case SDLK_DOWN: case SDLK_KP_2: key.scancode |= VXT_KEY_KP_DOWN_2; return key;
-                case SDLK_LEFT: case SDLK_KP_4: key.scancode |= VXT_KEY_KP_LEFT_4; return key;
-                case SDLK_RIGHT: case SDLK_KP_6: key.scancode |= VXT_KEY_KP_RIGHT_6; return key;
                 case SDLK_LCTRL: case SDLK_RCTRL: key.scancode |= VXT_KEY_CONTROL; return key;
                 case SDLK_LALT: key.scancode |= VXT_KEY_ALT; return key;
                 case SDLK_NUMLOCKCLEAR: key.scancode |= VXT_KEY_NUMLOCK; return key;
                 case SDLK_SCROLLLOCK: key.scancode |= VXT_KEY_SCROLLOCK; return key;
-                case SDLK_HOME: case SDLK_KP_7: key.scancode |= VXT_KEY_KP_HOME_7; return key;
-                case SDLK_PAGEUP: case SDLK_KP_9: key.scancode |= VXT_KEY_KP_PAGEUP_9; return key;
-                case SDLK_KP_5: key.scancode |= VXT_KEY_KP_5; return key;
-                case SDLK_END: case SDLK_KP_1: key.scancode |= VXT_KEY_KP_END_1; return key;
-                case SDLK_PAGEDOWN: case SDLK_KP_3: key.scancode |= VXT_KEY_KP_PAGEDOWN_3; return key;
-                case SDLK_INSERT: case SDLK_KP_0: key.scancode |= VXT_KEY_KP_INSERT; return key;
 				case SDLK_LSHIFT: key.scancode |= VXT_KEY_LSHIFT; return key;
                 case SDLK_RSHIFT: key.scancode |= VXT_KEY_RSHIFT; return key;
                 case SDLK_PRINTSCREEN: key.scancode |= VXT_KEY_PRINT; return key;
+
+				case SDLK_DELETE: key.scancode |= VXT_KEY_KP_DELETE_PERIOD; return key;
+                case SDLK_INSERT: key.scancode |= VXT_KEY_KP_INSERT_0; return key;
+				case SDLK_END: key.scancode |= VXT_KEY_KP_END_1; return key;
+				case SDLK_DOWN: key.scancode |= VXT_KEY_KP_DOWN_2; return key;
+				case SDLK_PAGEDOWN: key.scancode |= VXT_KEY_KP_PAGEDOWN_3; return key;
+				case SDLK_LEFT: key.scancode |= VXT_KEY_KP_LEFT_4; return key;
+				case SDLK_RIGHT: key.scancode |= VXT_KEY_KP_RIGHT_6; return key;
+				case SDLK_HOME: key.scancode |= VXT_KEY_KP_HOME_7; return key;
+				case SDLK_UP: key.scancode |= VXT_KEY_KP_UP_8; return key;
+                case SDLK_PAGEUP: key.scancode |= VXT_KEY_KP_PAGEUP_9; return key;
+
                 case SDLK_F1: key.scancode |= VXT_KEY_F1; return key;
                 case SDLK_F2: key.scancode |= VXT_KEY_F2; return key;
                 case SDLK_F3: key.scancode |= VXT_KEY_F3; return key;
@@ -294,22 +329,12 @@ static vxt_key_t sdl_getkey(void *ud)
 						case 'q': exit(0);
 						case 'a': replace_floppy(); continue;
 						case 'f': SDL_SetWindowFullscreen(sdl_window, SDL_GetWindowFlags(sdl_window) & (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP); continue;
+						case 'm': open_manual(); continue;
 					}
 			}
 		}
 	}
 	return key;
-}
-
-static void open_manual()
-{
-	#if defined(_WIN32)
-		system("cmd /c manual\\index.html");
-	#elif defined(__APPLE__) && defined(__MACH__)
-		system("open manual\\index.html");
-	#else
-		system("xdg-open manual\\index.html");
-	#endif
 }
 
 static void print_help()
@@ -341,6 +366,8 @@ int main(int argc, char *argv[])
 		if (!strcmp(*argv, "--hdboot")) { hdboot_arg = 1; continue; }
 		if (!strcmp(*argv, "--noaudio")) { noaudio_arg = 1; continue; }
 		if (!strcmp(*argv, "--bios")) { bios_arg = argc-- ? *(++argv) : bios_arg; continue; }
+		if (!strcmp(*argv, "--filter")) { scale_filter = argc-- ? *(++argv) : scale_filter; continue; }
+		if (!strcmp(*argv, "--driver")) { video_driver = argc-- ? *(++argv) : video_driver; continue; }
 		printf("Invalid parameter: %s\n", *argv); return -1;
 	}
 

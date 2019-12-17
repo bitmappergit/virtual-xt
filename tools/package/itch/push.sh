@@ -1,7 +1,5 @@
 #!/bin/bash
 
-ls
-
 cd ${TRAVIS_BUILD_DIR}/package
 butler validate virtualxt
 butler login

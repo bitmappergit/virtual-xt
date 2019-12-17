@@ -1,6 +1,6 @@
 @echo off
 
-set PACKAGE_DEST=%TRAVIS_BUILD_DIR%\package\virtualxt
+set PACKAGE_DEST="%TRAVIS_BUILD_DIR%\package\virtualxt"
 rem if exist %PACKAGE_DEST%\ (
 rem     rmdir /q /s %PACKAGE_DEST%
 rem )

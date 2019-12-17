@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <sys/timeb.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 
 #if defined(_WIN32) && !defined(__MINGW32__)
@@ -46,6 +47,7 @@
 vxt_emulator_t *e = 0;
 vxt_drive_t fd = {0};
 vxt_key_t auto_release = {0};
+int command_key = 0;
 
 const int text_color[] = {
 	0x000000,
@@ -121,6 +123,12 @@ static void replace_floppy()
 	if (fd.userdata) close((int)(intptr_t)fd.userdata);
 	fd.userdata = (void*)(intptr_t)f;
 	vxt_replace_floppy(e, &fd);
+}
+
+static int file_exist(const char *filename)
+{
+	struct stat buffer;
+	return stat(filename, &buffer) == 0;
 }
 
 static void close_window()
@@ -217,13 +225,33 @@ static void textmode(unsigned char *mem, byte *font, byte cursor, byte cx, byte 
 
 static void open_manual()
 {
+	char buffer[512] = {0};
+
 	#if defined(_WIN32)
-		system("cmd /c manual\\index.html");
+		strcpy(buffer, "cmd /c ");
+		if (file_exist("manual\\index.html"))
+			system(strcat(buffer, "manual\\index.html"));
+		else if (file_exist("doc\\manual\\index.html"))
+			system(strcat(buffer, "doc\\manual\\index.html"));
+		return;
 	#elif defined(__APPLE__) && defined(__MACH__)
-		system("open manual\\index.html");
+		strcpy(buffer, "open ");
 	#else
-		system("xdg-open manual\\index.html");
+		strcpy(buffer, "xdg-open ");
 	#endif
+
+	if (file_exist("manual/index.html"))
+		system(strcat(buffer, "manual/index.html"));
+	else if (file_exist("doc/manual/index.html"))
+		system(strcat(buffer, "doc/manual/index.html"));
+	else if (file_exist("../Resources/manual/index.html"))
+		system(strcat(buffer, "../Resources/manual/index.html"));
+	else if (file_exist("../share/virtualxt/manual/index.html"))
+		system(strcat(buffer, "../share/virtualxt/manual/index.html"));
+	else if (file_exist("/usr/local/share/virtualxt/manual/index.html"))
+		system(strcat(buffer, "/usr/local/share/virtualxt/manual/index.html"));
+	else
+		printf("Could not find the manual!\n");
 }
 
 static vxt_key_t sdl_getkey(void *ud)
@@ -256,21 +284,16 @@ static vxt_key_t sdl_getkey(void *ud)
 				auto_release = key;
 				auto_release.scancode |= VXT_MASK_KEY_UP;
 
-				// Reset any buffers
+				// Reset any buffers.
+				// Not sure we should do this. /aj
 				SDL_StopTextInput();
 				SDL_StartTextInput();
 				return key;
 			}
 
-			if (ev.type == SDL_KEYDOWN) {
-				key.scancode = VXT_KEY_INVALID;
-				if (ev.key.keysym.sym == SDLK_RALT) SDL_StopTextInput();
-			} else if (ev.type == SDL_KEYUP) {
-				key.scancode = VXT_MASK_KEY_UP;
-				if (ev.key.keysym.sym == SDLK_RALT && !ev.key.repeat) SDL_StartTextInput();
-			} else {
-				continue;
-			}
+			if (ev.type == SDL_KEYDOWN) key.scancode = VXT_KEY_INVALID;
+			else if (ev.type == SDL_KEYUP) key.scancode = VXT_MASK_KEY_UP;
+			else continue;
 
 			SDL_Keycode sym = ev.key.keysym.sym;
 			if (ev.key.keysym.mod & KMOD_NUM == 0) switch (sym)
@@ -322,9 +345,22 @@ static vxt_key_t sdl_getkey(void *ud)
                 case SDLK_F9: key.scancode |= VXT_KEY_F9; return key;
                 case SDLK_F10: key.scancode |= VXT_KEY_F10; return key;
 
-				default: // Special operations
+				case SDLK_F12:
+				{
+					if (ev.type == SDL_KEYDOWN) {
+						if (!ev.key.repeat) {
+							command_key = 1;
+							SDL_StopTextInput();
+						}
+					} else {
+						command_key = 0;
+						SDL_StartTextInput();
+					}
+					continue;
+				}
 
-					if (ev.type == SDL_KEYDOWN && ev.key.keysym.mod & KMOD_RALT) switch (sym)
+				default:
+					if (command_key && ev.type == SDL_KEYDOWN && !ev.key.repeat) switch (sym)
 					{
 						case 'q': exit(0);
 						case 'a': replace_floppy(); continue;
@@ -342,8 +378,7 @@ static void print_help()
 	printf("VirtualXT - IBM PC/XT Emulator\n");
 	printf("By Andreas T Jonsson\n\n");
 	printf("Version: " VERSION_STRING "\n\n");
-
-	printf("TODO: Add help text. :)\n");
+	printf("See manual for option. (-m)\n");
 }
 
 int main(int argc, char *argv[])

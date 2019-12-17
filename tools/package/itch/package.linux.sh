@@ -5,7 +5,7 @@ mkdir -p $PACKAGE_DEST/bin $PACKAGE_DEST/lib
 
 cp virtualxt $PACKAGE_DEST/bin
 cp -r doc/manual $PACKAGE_DEST
-cp tools/package/itch/freedos.img $PACKAGE_DEST
+cp tools/floppies/freedos_itch.img $PACKAGE_DEST/freedos.img
 cp tools/package/itch/virtualxt $PACKAGE_DEST
 cp tools/package/itch/itch.linux.toml $PACKAGE_DEST/.itch.toml
 

@@ -7,7 +7,7 @@ cp virtualxt $PACKAGE_DEST/VirtualXT.app/Contents/MacOS
 cp tools/package/itch/Info.plist $PACKAGE_DEST/VirtualXT.app/Contents
 cp doc/icon/icon.icns $PACKAGE_DEST/VirtualXT.app/Contents/Resources
 cp -r doc/manual $PACKAGE_DEST/VirtualXT.app/Contents/MacOS
-cp tools/package/itch/freedos.img $PACKAGE_DEST/VirtualXT.app
+cp tools/floppies/freedos_itch.img $PACKAGE_DEST/VirtualXT.app/freedos.img
 cp tools/package/itch/itch.osx.toml $PACKAGE_DEST/.itch.toml
 
 # Copy frameworks

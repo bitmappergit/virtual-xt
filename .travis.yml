@@ -20,6 +20,8 @@ matrix:
         - make config=release
         - ./tools/package/itch/package.linux.sh
 
+        - ls
+
     ################ OSX Build ################
 
     - name: OSX
@@ -65,6 +67,8 @@ matrix:
       script:
         - make config=release
         - ./tools/package/itch/package.bat
+
+        - dir
 
 ################ Common ################
 

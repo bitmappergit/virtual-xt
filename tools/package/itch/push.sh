@@ -1,5 +1,7 @@
 #!/bin/bash
 
+ls
+
 cd package
 butler validate virtualxt
 butler login

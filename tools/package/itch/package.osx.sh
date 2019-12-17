@@ -1,6 +1,7 @@
 #!/bin/bash
 
 PACKAGE_DEST=$TRAVIS_BUILD_DIR/package/virtualxt
+rm -rf $PACKAGE_DEST
 mkdir -p $PACKAGE_DEST/VirtualXT.app/Contents/MacOS $PACKAGE_DEST/VirtualXT.app/Contents/Resources $PACKAGE_DEST/VirtualXT.app/Contents/Frameworks
 
 cp virtualxt $PACKAGE_DEST/VirtualXT.app/Contents/MacOS

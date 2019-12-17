@@ -1,6 +1,7 @@
 @echo off
 
 set PACKAGE_DEST=%TRAVIS_BUILD_DIR%\package\virtualxt
+if exist %PACKAGE_DEST% rmdir %PACKAGE_DEST% /q /s
 mkdir %PACKAGE_DEST%
 
 copy virtualxt.exe %PACKAGE_DEST%

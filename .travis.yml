@@ -90,7 +90,7 @@ before_script:
 
 deploy:
   provider: script
-  file: ./package
+  skip_cleanup: true
   script: bash tools/package/itch/push.sh
   on:
     branch: release

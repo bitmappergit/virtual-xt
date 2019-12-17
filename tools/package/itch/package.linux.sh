@@ -1,6 +1,7 @@
 #!/bin/bash
 
 PACKAGE_DEST=$TRAVIS_BUILD_DIR/package/virtualxt
+rm -rf $PACKAGE_DEST
 mkdir -p $PACKAGE_DEST/bin $PACKAGE_DEST/lib
 
 cp virtualxt $PACKAGE_DEST/bin

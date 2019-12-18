@@ -189,7 +189,8 @@ static unsigned short get_millitm(void *ud) { struct timeb c; ftime(&c); return 
 static void quit_sdl() { if (sdl_window) close_window(); SDL_Quit(); }
 static void close_emulator() { if (e) vxt_close(e); }
 
-static void blit_char(SDL_Surface *dst, byte *font, byte ch, byte attrib, int x, int y) {
+static void blit_char(SDL_Surface *dst, byte *font, byte ch, byte attrib, int x, int y)
+{
 	assert(dst->format->BytesPerPixel == 4);
 
 	unsigned *pixels = (unsigned*)dst->pixels;
@@ -207,7 +208,8 @@ static void blit_char(SDL_Surface *dst, byte *font, byte ch, byte attrib, int x,
 	}
 }
 
-static void textmode(unsigned char *mem, byte *font, byte cursor, byte cx, byte cy) {
+static void textmode(unsigned char *mem, byte *font, byte cursor, byte cx, byte cy)
+{
 	const int nchar = 80*25;
 	for (int i = 0; i < nchar * 2; i+=2) {
 		unsigned char ch = mem[i];
@@ -221,6 +223,19 @@ static void textmode(unsigned char *mem, byte *font, byte cursor, byte cx, byte 
 	SDL_UpdateTexture(sdl_texture, 0, sdl_surface->pixels, sdl_surface->pitch);
 	SDL_RenderCopy(sdl_renderer, sdl_texture, 0, 0);
 	SDL_RenderPresent(sdl_renderer);
+}
+
+byte joystick_buttons(void *ud)
+{
+	SDL_GameController *controller = (SDL_GameController*)ud;
+	return (byte)((SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_B) << 1) | SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A));
+}
+
+void joystick_axis(void *ud, word *x, word *y)
+{
+	SDL_GameController *controller = (SDL_GameController*)ud;
+	*x = (word)SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX);
+	*y = (word)SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY);
 }
 
 static void open_manual()
@@ -387,7 +402,7 @@ int main(int argc, char *argv[])
 		ShowWindow(GetConsoleWindow(), SW_HIDE);
 	#endif
 
-	int hdboot_arg = 0, noaudio_arg = 0;
+	int hdboot_arg = 0, noaudio_arg = 0, joystick_arg = 0;
 	double mips_arg = 0.0;
 	const char *fd_arg = 0, *hd_arg = 0, *bios_arg = 0;
 
@@ -400,6 +415,7 @@ int main(int argc, char *argv[])
 		if (!strcmp(*argv, "--mips")) { mips_arg = argc-- ? atof(*(++argv)) : mips_arg; continue; }
 		if (!strcmp(*argv, "--hdboot")) { hdboot_arg = 1; continue; }
 		if (!strcmp(*argv, "--noaudio")) { noaudio_arg = 1; continue; }
+		if (!strcmp(*argv, "--joystick")) { joystick_arg = 1; continue; }
 		if (!strcmp(*argv, "--bios")) { bios_arg = argc-- ? *(++argv) : bios_arg; continue; }
 		if (!strcmp(*argv, "--filter")) { scale_filter = argc-- ? *(++argv) : scale_filter; continue; }
 		if (!strcmp(*argv, "--driver")) { video_driver = argc-- ? *(++argv) : video_driver; continue; }
@@ -460,6 +476,27 @@ int main(int argc, char *argv[])
 
 	SDL_Init(SDL_INIT_TIMER);
 	atexit(quit_sdl);
+
+	vxt_joystick_t joystick = {.userdata = 0, .buttons = joystick_buttons, .axis = joystick_axis};
+	if (joystick_arg)
+	{
+		SDL_Init(SDL_INIT_JOYSTICK);
+
+		SDL_Joystick *sdl_joystick = 0;
+		for (int i = 0; i < SDL_NumJoysticks(); i++) {
+			if (sdl_joystick = SDL_JoystickOpen(i)) {
+				printf("Joystick found: %s\n", SDL_JoystickName(sdl_joystick));
+				break;
+			}
+		}
+
+		if (sdl_joystick && SDL_JoystickGetAttached(sdl_joystick)) {
+			printf("Joystick initialized!\n");
+			joystick.userdata = sdl_joystick;
+			vxt_set_joystick(e, &joystick);
+			SDL_JoystickEventState(SDL_ENABLE);
+		}
+	}
 
 	if (!fd_arg && !hd_arg)
 		replace_floppy();

@@ -91,6 +91,7 @@ struct vxt_emulator {
 	byte video_mode;
 	vxt_video_t *video;
 	
+	vxt_joystick_t *joystick;
 	vxt_serial_t *serial[4];
 	vxt_drive_t *disk[2];
 	vxt_clock_t *clock;
@@ -281,6 +282,22 @@ static int AAA_AAS(vxt_emulator_t *e, char which_operation)
 	return (e->regs16[REG_AX] += 262 * which_operation*set_AF(e, set_CF(e, ((e->regs8[REG_AL] & 0x0F) > 9) || e->regs8[FLAG_AF])), e->regs8[REG_AL] &= 0x0F);
 }
 
+static void emuctl_service(vxt_emulator_t *e, byte service)
+{
+	switch (service)
+	{
+		case 1: // Joystick service
+		{
+			if (e->regs8[REG_AH]) // Read status for joystick 1
+			{
+
+			}
+			else // Get number of sticks
+				e->regs8[REG_AL] = e->joystick ? 1 : 0;
+		}
+	}
+}
+
 vxt_emulator_t *vxt_open(vxt_video_t *video, vxt_clock_t *clk, void *mem)
 {
 	vxt_emulator_t *e = (vxt_emulator_t*)mem;
@@ -333,6 +350,7 @@ void vxt_replace_floppy(vxt_emulator_t *e, vxt_drive_t *fd) {
 void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac, byte silence) { e->pause_audio = ac; e->audio_silence = silence; }
 void vxt_set_port_map(vxt_emulator_t *e, vxt_port_map_t *map) { e->port_map = map; }
 void vxt_set_serial(vxt_emulator_t *e, int port, vxt_serial_t *com) { e->serial[port-1] = com; }
+void vxt_set_joystick(vxt_emulator_t *e, vxt_joystick_t *stick) { e->joystick = stick; }
 void vxt_close(vxt_emulator_t *e) { if (e->mem_block) free(e->mem_block); }
 int vxt_blink(vxt_emulator_t *e) { return e->blink; }
 size_t vxt_memory_required() { return sizeof(vxt_emulator_t); }
@@ -621,10 +639,12 @@ int vxt_step(vxt_emulator_t *e)
 		OPCODE 21: // IN AL/AX, DX/imm8
 			e->io_ports[0x20] = 0; // PIC EOI
 			e->io_ports[0x42] = --e->io_ports[0x40]; // PIT channel 0/2 read placeholder
+			e->io_ports[0x201] = 0; // Reset joystick
 			e->io_ports[0x3DA] ^= 9; // CGA refresh
 			e->scratch_uint = e->extra ? e->regs16[REG_DX] : (unsigned char)e->i_data0;
 			e->scratch_uint == 0x60 && (e->io_ports[0x64] = 0); // Scancode read flag
 			e->scratch_uint == 0x3D5 && (e->io_ports[0x3D4] >> 1 == 7) && (e->io_ports[0x3D5] = ((e->mem[0x49E]*80 + e->mem[0x49D] + CAST(short)e->mem[0x4AD]) & (e->io_ports[0x3D4] & 1 ? 0xFF : 0xFF00)) >> (e->io_ports[0x3D4] & 1 ? 0 : 8)); // CRT cursor position
+			e->scratch_uint == 0x201 && printf("Warning! Reading joystick data directly is not supported!\n");
 			e->port_map && e->port_map->filter(e->port_map->userdata, e->scratch_uint, 0) && (e->io_ports[e->scratch_uint] = e->port_map->in(e->port_map->userdata, e->scratch_uint));
 			R_M_OP(e->regs8[REG_AL], =, e->io_ports[e->scratch_uint]);
 		OPCODE 22: // OUT DX/imm8, AL/AX
@@ -637,6 +657,7 @@ int vxt_step(vxt_emulator_t *e)
 			e->scratch_uint == 0x3D5 && (e->io_ports[0x3D4] >> 1 == 7) && (e->scratch2_uint = ((e->mem[0x49E]*80 + e->mem[0x49D] + CAST(short)e->mem[0x4AD]) & (e->io_ports[0x3D4] & 1 ? 0xFF00 : 0xFF)) + (e->regs8[REG_AL] << (e->io_ports[0x3D4] & 1 ? 0 : 8)) - CAST(short)e->mem[0x4AD], e->mem[0x49D] = e->scratch2_uint % 80, e->mem[0x49E] = e->scratch2_uint / 80); // CRT cursor position
 			e->scratch_uint == 0x3B5 && e->io_ports[0x3B4] == 1 && (e->GRAPHICS_X = e->regs8[REG_AL] * 16); // Hercules resolution reprogramming. Defaults are set in the BIOS
 			e->scratch_uint == 0x3B5 && e->io_ports[0x3B4] == 6 && (e->GRAPHICS_Y = e->regs8[REG_AL] * 4);
+			e->scratch_uint == 0x201 && printf("Warning! Writing joystick data directly is not supported!\n");
 			e->port_map && e->port_map->filter(e->port_map->userdata, e->scratch_uint, 1) && (e->port_map->out(e->port_map->userdata, e->scratch_uint, e->regs8[REG_AL]), 0);
 		OPCODE 23: // REPxx
 			e->rep_override_en = 2;
@@ -711,14 +732,25 @@ int vxt_step(vxt_emulator_t *e)
 		OPCODE 48: // Emulator-specific 0F xx opcodes
 			switch ((char)e->i_data0)
 			{
-				OPCODE_CHAIN 0: // PUTCHAR_AL
+				OPCODE_CHAIN 0: // EMUCTL
+					if (!*e->regs8) return 0;
+					emuctl_service(e, *e->regs8);
+				OPCODE 1: // DEBUG
+					printf(
+						"\nAX: 0x%X (0x%X,0x%X),\tBX: 0x%X (0x%X,0x%X)\nCX: 0x%X (0x%X,0x%X),\tDX: 0x%X (0x%X,0x%X)\n",
+						e->regs16[REG_AX], e->regs8[REG_AL], e->regs8[REG_AH],
+						e->regs16[REG_BX], e->regs8[REG_BL], e->regs8[REG_BH],
+						e->regs16[REG_CX], e->regs8[REG_CL], e->regs8[REG_CH],
+						e->regs16[REG_DX], e->regs8[REG_DL], e->regs8[REG_DH]
+					);
+				OPCODE 2: // PUTCHAR_AL
 					//e->term->putchar(e->term->userdata, *e->regs8)
 					{}
-				OPCODE 1: // GET_RTC
+				OPCODE 3: // GET_RTC
 					memcpy(e->mem + SEGREG(REG_ES, REG_BX,), e->clock->localtime(e->clock->userdata), sizeof(struct tm));
 					CAST(short)e->mem[SEGREG(REG_ES, REG_BX, 36+)] = e->clock->millitm(e->clock->userdata);
-				OPCODE 2: // DISK_READ
-				OPCODE_CHAIN 3: // DISK_WRITE
+				OPCODE 4: // DISK_READ
+				OPCODE_CHAIN 5: // DISK_WRITE
 					if (e->disk[e->regs8[REG_DL]])
 					{
 						e->scratch_disk = e->disk[e->regs8[REG_DL]];
@@ -726,7 +758,7 @@ int vxt_step(vxt_emulator_t *e)
 							? ((char)e->i_data0 == 3 ? (int(*)())e->scratch_disk->write : (int(*)())e->scratch_disk->read)(e->scratch_disk->userdata, e->mem + SEGREG(REG_ES, REG_BX,), e->regs16[REG_AX])
 							: 0;
 					} else e->regs8[REG_AL] = 0;
-				OPCODE 4: // SERIAL_COM
+				OPCODE 6: // SERIAL_COM
 					{
 						vxt_serial_t *com = e->serial[e->regs16[REG_DX]];
 						if (!com) e->regs16[REG_AX] = 0;
@@ -737,14 +769,6 @@ int vxt_step(vxt_emulator_t *e)
 							case 2: e->regs8[REG_AL] = com->receive(com->userdata); e->regs8[REG_AH] = com->status(com->userdata).line; break;
 						}
 					}
-				OPCODE 5: // DEBUG
-					printf(
-						"\nAX: 0x%X (0x%X,0x%X),\tBX: 0x%X (0x%X,0x%X)\nCX: 0x%X (0x%X,0x%X),\tDX: 0x%X (0x%X,0x%X)\n",
-						e->regs16[REG_AX], e->regs8[REG_AL], e->regs8[REG_AH],
-						e->regs16[REG_BX], e->regs8[REG_BL], e->regs8[REG_BH],
-						e->regs16[REG_CX], e->regs8[REG_CL], e->regs8[REG_CH],
-						e->regs16[REG_DX], e->regs8[REG_DL], e->regs8[REG_DH]
-					);
 			}
 	}
 

@@ -12,28 +12,32 @@
 ; world. They are described in detail in the hint.html file, which forms part of the emulator
 ; distribution.
 
-%macro	extended_putchar_al 0
+%macro	extended_emuctl 0
 	db	0x0f, 0x00
 %endmacro
 
-%macro	extended_get_rtc 0
+%macro	extended_debug 0
 	db	0x0f, 0x01
 %endmacro
 
-%macro	extended_read_disk 0
+%macro	extended_putchar_al 0
 	db	0x0f, 0x02
 %endmacro
 
-%macro	extended_write_disk 0
+%macro	extended_get_rtc 0
 	db	0x0f, 0x03
 %endmacro
 
-%macro	extended_serial_com 0
+%macro	extended_read_disk 0
 	db	0x0f, 0x04
 %endmacro
 
-%macro	extended_debug 0
+%macro	extended_write_disk 0
 	db	0x0f, 0x05
+%endmacro
+
+%macro	extended_serial_com 0
+	db	0x0f, 0x06
 %endmacro
 
 org	100h				; BIOS loads at offset 0x0100
@@ -259,12 +263,12 @@ boot:	mov	ax, 0
 
 ; Clear video memory shadow buffer
 
-	mov	ax, 0xc800
-	mov	es, ax
-	mov	di, 0
-	mov	cx, 80*25
-	mov	ax, 0x0700
-	rep	stosw
+	; mov	ax, 0xc800
+	; mov	es, ax
+	; mov	di, 0
+	; mov	cx, 80*25
+	; mov	ax, 0x0700
+	; rep	stosw
 
 ; Set up some I/O ports, between 0 and FFF. Most of them we set to 0xFF, to indicate no device present
 
@@ -296,6 +300,8 @@ next_out:
 	cmp	dx, 0x61	; Sound output
 	je	next_out
 	cmp	dx, 0x64	; Keyboard status
+	je	next_out
+	cmp	dx, 0x201	; Joystick input
 	je	next_out
 
 	out	dx, al
@@ -2046,12 +2052,66 @@ int15:	; Here we do not support any of the functions, and just return
 	; je	int15_intercept
 	; cmp	ah, 0x88
 	; je	int15_getextmem
+	cmp	ah, 0x84
+	je int15_joystick
 
-; Otherwise, function not supported
+	; Otherwise, function not supported
 
-	mov	ah, 0x86
+	jmp	int15_not_supported
 
-	jmp	reach_stack_stc
+  int15_joystick:
+
+	; Check if joysticks ar present
+
+	push ax
+
+	mov al, 1 			; Joystick service
+	mov ah, 0 			; Check number of sticks
+	extended_emuctl
+	cmp al, 0
+
+	pop ax
+
+	je int15_not_supported
+
+	; Check service requested
+
+	cmp	dx, 0
+	je joystick_buttons
+	cmp	dx, 1
+	je joystick_axis
+
+	jmp	int15_not_supported
+
+	joystick_buttons:
+
+	push bx
+	push cx
+
+	mov al, 1 			; Joystick service
+	mov ah, 1 			; Joystick 1
+	extended_emuctl
+cpu 186
+	shl al, 4 			; Button states
+cpu 8086
+	
+	pop cx
+	pop bx
+
+	jmp	joystick_done
+
+	joystick_axis:
+
+	mov al, 1 			; Joystick service
+	mov ah, 1 			; Joystick 1
+	extended_emuctl
+	mov ax, bx
+	mov bx, cx
+	mov dx, 0
+
+	joystick_done:
+
+	jmp reach_stack_clc
 
 ;  int15_sysconfig: ; Return address of system configuration table in ROM
 ;
@@ -2077,6 +2137,11 @@ int15:	; Here we do not support any of the functions, and just return
 ;	mov	ah,0x86
 ;
 ;	jmp	reach_stack_stc
+
+  int15_not_supported:
+
+	mov	ah, 0x86
+	jmp	reach_stack_stc
 
 ; ************************* INT 16h handler - keyboard
 

@@ -193,6 +193,13 @@ typedef struct {
 } vxt_port_map_t;
 
 typedef struct {
+    void *userdata;
+
+    byte (*buttons)(void*);
+    void (*axis)(void*,word*,word*);
+} vxt_joystick_t;
+
+typedef struct {
     byte modem;
     byte line;
 } vxt_serial_status_t;
@@ -223,6 +230,7 @@ extern void vxt_replace_floppy(vxt_emulator_t *e, vxt_drive_t *fd);
 extern void vxt_set_harddrive(vxt_emulator_t *e, vxt_drive_t *hd);
 extern void vxt_set_port_map(vxt_emulator_t *e, vxt_port_map_t *map);
 extern void vxt_set_serial(vxt_emulator_t *e, int port, vxt_serial_t *com);
+extern void vxt_set_joystick(vxt_emulator_t *e, vxt_joystick_t *stick);
 extern void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac, byte silence);
 extern int vxt_blink(vxt_emulator_t *e);
 extern int vxt_step(vxt_emulator_t *e);

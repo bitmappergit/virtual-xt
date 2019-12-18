@@ -290,7 +290,7 @@ static void emuctl_service(vxt_emulator_t *e, byte service)
 		{
 			if (e->regs8[REG_AH]) // Read status for joystick 1
 			{
-
+				// TODO: Implement this!
 			}
 			else // Get number of sticks
 				e->regs8[REG_AL] = e->joystick ? 1 : 0;
@@ -755,7 +755,7 @@ int vxt_step(vxt_emulator_t *e)
 					{
 						e->scratch_disk = e->disk[e->regs8[REG_DL]];
 						e->regs8[REG_AL] = ~e->scratch_disk->seek(e->scratch_disk->userdata, CAST(unsigned)e->regs16[REG_BP] << 9, 0)
-							? ((char)e->i_data0 == 3 ? (int(*)())e->scratch_disk->write : (int(*)())e->scratch_disk->read)(e->scratch_disk->userdata, e->mem + SEGREG(REG_ES, REG_BX,), e->regs16[REG_AX])
+							? ((char)e->i_data0 == 5 ? (int(*)())e->scratch_disk->write : (int(*)())e->scratch_disk->read)(e->scratch_disk->userdata, e->mem + SEGREG(REG_ES, REG_BX,), e->regs16[REG_AX])
 							: 0;
 					} else e->regs8[REG_AL] = 0;
 				OPCODE 6: // SERIAL_COM

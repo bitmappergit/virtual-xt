@@ -743,22 +743,19 @@ int vxt_step(vxt_emulator_t *e)
 						e->regs16[REG_CX], e->regs8[REG_CL], e->regs8[REG_CH],
 						e->regs16[REG_DX], e->regs8[REG_DL], e->regs8[REG_DH]
 					);
-				OPCODE 2: // PUTCHAR_AL
-					//e->term->putchar(e->term->userdata, *e->regs8)
-					{}
-				OPCODE 3: // GET_RTC
+				OPCODE 2: // GET_RTC
 					memcpy(e->mem + SEGREG(REG_ES, REG_BX,), e->clock->localtime(e->clock->userdata), sizeof(struct tm));
 					CAST(short)e->mem[SEGREG(REG_ES, REG_BX, 36+)] = e->clock->millitm(e->clock->userdata);
-				OPCODE 4: // DISK_READ
-				OPCODE_CHAIN 5: // DISK_WRITE
+				OPCODE 3: // DISK_READ
+				OPCODE_CHAIN 4: // DISK_WRITE
 					if (e->disk[e->regs8[REG_DL]])
 					{
 						e->scratch_disk = e->disk[e->regs8[REG_DL]];
 						e->regs8[REG_AL] = ~e->scratch_disk->seek(e->scratch_disk->userdata, CAST(unsigned)e->regs16[REG_BP] << 9, 0)
-							? ((char)e->i_data0 == 5 ? (int(*)())e->scratch_disk->write : (int(*)())e->scratch_disk->read)(e->scratch_disk->userdata, e->mem + SEGREG(REG_ES, REG_BX,), e->regs16[REG_AX])
+							? ((char)e->i_data0 == 4 ? (int(*)())e->scratch_disk->write : (int(*)())e->scratch_disk->read)(e->scratch_disk->userdata, e->mem + SEGREG(REG_ES, REG_BX,), e->regs16[REG_AX])
 							: 0;
 					} else e->regs8[REG_AL] = 0;
-				OPCODE 6: // SERIAL_COM
+				OPCODE 5: // SERIAL_COM
 					{
 						vxt_serial_t *com = e->serial[e->regs16[REG_DX]];
 						if (!com) e->regs16[REG_AX] = 0;

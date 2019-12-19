@@ -20,24 +20,20 @@
 	db	0x0f, 0x01
 %endmacro
 
-%macro	extended_putchar_al 0
+%macro	extended_get_rtc 0
 	db	0x0f, 0x02
 %endmacro
 
-%macro	extended_get_rtc 0
+%macro	extended_read_disk 0
 	db	0x0f, 0x03
 %endmacro
 
-%macro	extended_read_disk 0
+%macro	extended_write_disk 0
 	db	0x0f, 0x04
 %endmacro
 
-%macro	extended_write_disk 0
-	db	0x0f, 0x05
-%endmacro
-
 %macro	extended_serial_com 0
-	db	0x0f, 0x06
+	db	0x0f, 0x05
 %endmacro
 
 org	100h				; BIOS loads at offset 0x0100
@@ -260,15 +256,6 @@ boot:	mov	ax, 0
 	mov	cx, 80*25
 	mov	ax, 0x0700
 	rep	stosw
-
-; Clear video memory shadow buffer
-
-	; mov	ax, 0xc800
-	; mov	es, ax
-	; mov	di, 0
-	; mov	cx, 80*25
-	; mov	ax, 0x0700
-	; rep	stosw
 
 ; Set up some I/O ports, between 0 and FFF. Most of them we set to 0xFF, to indicate no device present
 
@@ -736,7 +723,7 @@ int10:
 	out	dx, al
 
 	mov	bh, 7	
-	call	clear_screen
+	call clear_screen
 
 	mov	ax, 0x30
 	jmp	svmn_exit
@@ -753,7 +740,7 @@ int10:
 	mov	[es:vidmode-bios_data], al
 
 	mov	bh, 7		; Black background, white foreground
-	call	clear_screen	; ANSI clear screen
+	call clear_screen
 
 	cmp	byte [es:vidmode-bios_data], 6
 	je	set6
@@ -794,15 +781,9 @@ int10:
 
 	and	ch, 01100000b
 	cmp	ch, 00100000b
-	jne	cur_visible
+	jne	cur_done
 
 	mov	byte [cursor_visible-bios_data], 0	; Hide cursor
-	call	ansi_hide_cursor
-	jmp	cur_done
-
-    cur_visible:
-
-	call	ansi_show_cursor
 
     cur_done:
 
@@ -823,45 +804,6 @@ int10:
 	mov	[crt_curpos_y-bios_data], dh
 	mov	[curpos_x-bios_data], dl
 	mov	[crt_curpos_x-bios_data], dl
-
-	cmp	dh, 24
-	jbe	skip_set_cur_row_max
-
-	; If cursor is moved off the screen, then hide it
-	call	ansi_hide_cursor
-	jmp	skip_set_cur_ansi
-	
-    skip_set_cur_row_max:
-
-     	cmp	dl, 79
-	jbe	skip_set_cur_col_max
-
-	; If cursor is moved off the screen, then hide it
-	call	ansi_hide_cursor
-	jmp	skip_set_cur_ansi
-	
-    skip_set_cur_col_max:
-
-	mov	al, 0x1B	; ANSI
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-	mov	al, dh		; Row number
-	inc	al
-	call	puts_decimal_al
-	mov	al, ';'		; ANSI
-	extended_putchar_al
-	mov	al, dl		; Column number
-	inc	al
-	call	puts_decimal_al
-	mov	al, 'H'		; Set cursor position command
-	extended_putchar_al
-
-	cmp	byte [cursor_visible-bios_data], 1
-	jne	skip_set_cur_ansi
-	call	ansi_show_cursor
-
-    skip_set_cur_ansi:
 
 	pop	ax
 	pop	ds
@@ -884,32 +826,6 @@ int10:
 
   int10_scrollup:
 
-	push	bx
-	push	cx
-	push	bp
-	push	ax
-
-	mov	bp, bx		; Convert from CGA to ANSI
-	mov	cl, 12
-	ror	bp, cl
-	and	bp, 7
-	mov	bl, byte [cs:bp+colour_table]
-	add	bl, 10
-
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-	mov	al, bl		; Background colour
-	call	puts_decimal_al
-	mov	al, 'm'		; Set cursor position command
-	extended_putchar_al
-
-	pop	ax
-	pop	bp
-	pop	cx
-	pop	bx
-
 	cmp	al, 0 ; Clear window
 	jne	cls_partial
 
@@ -925,98 +841,7 @@ int10:
 	call	clear_screen
 	iret
 
-  cls_partial:
-
-	push 	ax
-	push	bx
-
-	mov	bl, al		; Number of rows to scroll are now in bl
-	cmp	bl, 0		; Clear whole window?
-	jne	cls_partial_up_whole
-
-	mov	bl, 25		; 25 rows
-
-  cls_partial_up_whole:
-
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-
-	cmp	ch, 0		; Start row 1? Maybe full screen
-	je	cls_maybe_fs
-	jmp	cls_not_fs
-
-    cls_maybe_fs:
-
-	cmp	dh, 24		; End row 25? Full screen for sure
-	je	cls_fs
-
-    cls_not_fs:
-
-	mov	al, ch		; Start row
-	inc	al
-	call	puts_decimal_al
-	mov	al, ';'		; ANSI
-	extended_putchar_al
-	mov	al, dh		; End row
-	inc	al
-	call	puts_decimal_al
-
-    cls_fs:
-
-	mov	al, 'r'		; Set scrolling window
-	extended_putchar_al
-
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-
-	cmp	bl, 1
-	jne	cls_fs_multiline
-
-	mov	al, 'M'
-	jmp	cs_fs_ml_out
-
-cls_fs_multiline:
-
-	mov	al, bl		; Number of rows
-	call	puts_decimal_al
-	mov	al, 'S'		; Scroll up
-
-cs_fs_ml_out:
-
-	extended_putchar_al
-
-	pop	bx
-	pop	ax
-
-	; Update "actual" cursor position with expected value - different ANSI terminals do different things
-	; to the cursor position when you scroll
-
-	push	ax
-	push	bx
-	push 	dx
-	push	es
-
-	mov	ax, 0x40
-	mov	es, ax
-
-	mov	ah, 2
-	mov	bh, 0
-	mov	dh, [es:curpos_y-bios_data]
-	mov	dl, [es:curpos_x-bios_data]
-	int	10h
-
-	pop	es
-	pop	dx
-	pop	bx
-	pop	ax
-
-int10_scroll_up_vmem_update:
-
-	; Now, we need to update video memory
+	cls_partial:
 
 	push	bx
 	push	ax
@@ -1027,8 +852,6 @@ int10_scroll_up_vmem_update:
 	push	dx
 	push	si
 	push	di
-
-	;mov	byte [cs:vram_dirty], 1
 
 	push	bx
 
@@ -1075,7 +898,7 @@ int10_scroll_up_vmem_update:
 	cmp	ch, dh
 	jae	cls_vmem_scroll_up_one_done
 
-vmem_scroll_up_copy_next_row:
+	; Copy next row
 
 	push	cx
 	mov	cx, ax		; CX is now the length (in words) of the row to copy
@@ -1101,15 +924,6 @@ vmem_scroll_up_copy_next_row:
 
     cls_vmem_scroll_up_done:
 
-	;mov	al, 0x1B	; Escape
-	;extended_putchar_al
-	;mov	al, '['		; ANSI
-	;extended_putchar_al
-	;mov	al, '0'		; Reset attributes
-	;extended_putchar_al
-	;mov	al, 'm'
-	;extended_putchar_al
-
 	pop	di
 	pop	si
 	pop	dx
@@ -1124,33 +938,7 @@ vmem_scroll_up_copy_next_row:
 	
   int10_scrolldown:
 
-	push	bx
-	push	cx
-	push	bp
-	push	ax
-
-	mov	bp, bx		; Convert from CGA to ANSI
-	mov	cl, 12
-	ror	bp, cl
-	and	bp, 7
-	mov	bl, byte [cs:bp+colour_table]
-	add	bl, 10
-
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-	mov	al, bl		; Background colour
-	call	puts_decimal_al
-	mov	al, 'm'		; Set cursor position command
-	extended_putchar_al
-
-	pop	ax
-	pop	bp
-	pop	cx
-	pop	bx
-
-	cmp	al, 0 ; Clear window
+  	cmp	al, 0 ; Clear window
 	jne	cls_partial_down
 
 	cmp	cx, 0 ; Start of screen
@@ -1165,100 +953,7 @@ vmem_scroll_up_copy_next_row:
 	call	clear_screen
 	iret
 
-  cls_partial_down:
-
-	push 	ax
-	push	bx
-
-	mov	bx, 0
-	mov	bl, al		; Number of rows to scroll are now in bl
-
-	cmp	bl, 0		; Clear whole window?
-	jne	cls_partial_down_whole
-
-	mov	bl, 25		; 25 rows
-
-  cls_partial_down_whole:
-
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-
-	cmp	ch, 0		; Start row 1? Maybe full screen
-	je	cls_maybe_fs_down
-	jmp	cls_not_fs_down
-
-    cls_maybe_fs_down:
-
-	cmp	dh, 24		; End row 25? Full screen for sure
-	je	cls_fs_down
-
-    cls_not_fs_down:
-
-	mov	al, ch		; Start row
-	inc	al
-	call	puts_decimal_al
-	mov	al, ';'		; ANSI
-	extended_putchar_al
-	mov	al, dh		; End row
-	inc	al
-	call	puts_decimal_al
-
-    cls_fs_down:
-
-	mov	al, 'r'		; Set scrolling window
-	extended_putchar_al
-
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-
-	cmp	bl, 1
-	jne	cls_fs_down_multiline
-
-	mov	al, 'D'
-	jmp	cs_fs_down_ml_out
-
-    cls_fs_down_multiline:
-
-	mov	al, bl		; Number of rows
-	call	puts_decimal_al
-	mov	al, 'T'		; Scroll down
-
-    cs_fs_down_ml_out:
-
-	extended_putchar_al
-
-	; Update "actual" cursor position with expected value - different ANSI terminals do different things
-	; to the cursor position when you scroll
-
-	pop	bx
-	pop	ax
-
-	push	ax
-	push	bx
-	push 	dx
-	push	es
-
-	mov	ax, 0x40
-	mov	es, ax
-
-	mov	ah, 2
-	mov	bh, 0
-	mov	dh, [es:curpos_y-bios_data]
-	mov	dl, [es:curpos_x-bios_data]
-	int	10h
-
-	pop	es
-	pop	dx
-	pop	bx
-	pop	ax
-
-int10_scroll_down_vmem_update:
-
-	; Now, we need to update video memory
+	cls_partial_down:
 
 	push	ax
 	push	bx
@@ -1269,8 +964,6 @@ int10_scroll_down_vmem_update:
 	push	dx
 	push	si
 	push	di
-
-	;mov	byte [cs:vram_dirty], 1
 
 	push	bx
 
@@ -1346,15 +1039,6 @@ int10_scroll_down_vmem_update:
 	pop	es
 	pop	ds
 
-	;mov	al, 0x1B	; Escape
-	;extended_putchar_al
-	;mov	al, '['		; ANSI
-	;extended_putchar_al
-	;mov	al, '0'		; Reset attributes
-	;extended_putchar_al
-	;mov	al, 'm'
-	;extended_putchar_al
-
 	pop	bx
 	pop	ax
 	iret
@@ -1404,10 +1088,6 @@ int10_scroll_down_vmem_update:
 
   int10_write_char:
 
-	; First write the character to a buffer at C000:0. This is so that
-	; we can later retrieve it using the get character at cursor function,
-	; which GWBASIC uses.
-
 	push	ds
 	push	es
 	push	cx
@@ -1418,17 +1098,22 @@ int10_scroll_down_vmem_update:
 
 	push	ax
 
-	mov	cl, al
-	mov	ch, 7
-
 	mov	bx, 0x40
 	mov	es, bx
+
+	mov	cl, al
+	mov	ch, 7
 
 	mov	bx, 0xb800
 	mov	ds, bx
 
 	cmp	al, 0x20
-	jl	int10_write_char_skip_mem
+	jl	int10_write_char_skip
+
+	cmp byte [es:vidmode-bios_data], 4
+	je 	int10_write_char_cga320
+	cmp byte [es:vidmode-bios_data], 5
+	je 	int10_write_char_cga320
 
 	mov	bx, 160
 	mov	ax, 0
@@ -1442,20 +1127,20 @@ int10_scroll_down_vmem_update:
 
 	mov	[bx], cx
 
-	int10_write_char_skip_mem:
+	jmp int10_write_char_skip
+
+	int10_write_char_cga320:
+
+	call put_cga320_char
+
+	int10_write_char_skip:
 	
 	pop	ax
-	push	ax
-
-	extended_putchar_al
+	push ax
 
 	jmp	int10_write_char_skip_lines
 
   int10_write_char_attrib:
-
-	; First write the character to a buffer at C000:0. This is so that
-	; we can later retrieve it using the get character at cursor function,
-	; which GWBASIC uses.
 
 	push	ds
 	push	es
@@ -1492,74 +1177,28 @@ int10_scroll_down_vmem_update:
 	mov	bh, bl
 	and	bl, 7		; Foreground colour now in bl
 
-	mov	bp, bx		; Convert from CGA to ANSI
-	and	bp, 0xff
-	mov	bl, byte [cs:bp+colour_table]
-
 	and	bh, 8		; Bright attribute now in bh
 cpu	186
 	shr	bh, 3
 cpu	8086
-
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-	mov	al, bh		; Bright attribute
-	call	puts_decimal_al
-	mov	al, ';'
-	extended_putchar_al
-	mov	al, bl		; Foreground colour
-	call	puts_decimal_al
-
 	mov	bl, ch
-
 	mov	bh, bl
 cpu	186
 	shr	bl, 4
 cpu	8086
 	and	bl, 7		; Background colour now in bl
 
-	mov	bp, bx		; Convert from CGA to ANSI
-	and	bp, 0xff
-	mov	bl, byte [cs:bp+colour_table]
-
 	add	bl, 10
 	; rol	bh, 1
 	; and	bh, 1		; Bright attribute now in bh (not used right now)
-
-	mov	al, ';'
-	extended_putchar_al
-	mov	al, bl		; Background colour
-	call	puts_decimal_al
-	mov	al, 'm'		; Set cursor position command
-	extended_putchar_al
 	
 	pop	cx
-	pop	ax
-	push	ax
-
-    out_another_char:
-
-	extended_putchar_al
-	dec	cx
-	cmp	cx, 0
-	jne	out_another_char
-
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-	mov	al, '0'		; Reset attributes
-	extended_putchar_al
-	mov	al, 'm'
-	extended_putchar_al
 
     int10_write_char_skip_lines:
 
 	pop	ax
 
-	push	es
+	push es
 	pop	ds
 
 	cmp	al, 0x08
@@ -1613,7 +1252,7 @@ cpu	8086
 
 	pushf
 	push	cs
-	call	int10_scroll_up_vmem_update
+	call	int10_scrollup
 
     int10_write_char_attrib_done:
 
@@ -1626,7 +1265,12 @@ cpu	8086
 	push bx
 
 	cmp	al, 0x20
-	jl	int10_write_char_attrib_skip_mem
+	jl	int10_write_char_attrib_skip
+
+	cmp byte [vidmode-bios_data], 4
+	je 	int10_write_char_attrib_cga320
+	cmp byte [vidmode-bios_data], 5
+	je 	int10_write_char_attrib_cga320
 
 	mov	bx, 0xb800
 	mov	ds, bx
@@ -1636,7 +1280,13 @@ cpu	8086
 
 	mov	[bx], cx
 
-	int10_write_char_attrib_skip_mem:
+	jmp int10_write_char_attrib_skip
+
+	int10_write_char_attrib_cga320:
+
+	call put_cga320_char
+
+	int10_write_char_attrib_skip:
 
 	pop	bx
 	pop	bp
@@ -1647,6 +1297,194 @@ cpu	8086
 	pop	ds
 
 	iret
+
+  ; Larg parts of this function is from Julian Olds "plus" modifications to 8086tiny.
+
+  put_cga320_char:
+	; Character is in AL
+	; Colour is in AH
+	push	ax
+	push	bx
+	push	cx
+	push	ds	
+	push	es
+	push	di
+	push	bp
+
+	; Get the colour mask into BH
+	cmp	ah, 1
+	jne	put_cga320_char_c2
+	mov	bh, 0x55
+	jmp	put_cga320_char_cdone
+	put_cga320_char_c2:
+	cmp	ah, 2
+	jne	put_cga320_char_c3
+	mov	bh, 0xAA
+	jmp	put_cga320_char_cdone
+	put_cga320_char_c3:
+	mov	bh, 0xFF
+
+	put_cga320_char_cdone:
+	; Get glyph character top offset into bp and character segment into cx
+	test	al, 0x80
+	jne	put_cga320_char_high
+
+	; Characters 0 .. 127 are always in ROM
+	mov	ah, 0
+	shl	ax, 1
+	shl	ax, 1
+	shl	ax, 1
+	add	ax, cga_font
+	mov	bp, ax
+
+	mov	cx, cs
+
+	jmp	put_cga320_char_vidoffset
+
+	put_cga320_char_high:
+	; Characters 128 .. 255 get their address from interrupt vector 1F
+	and	al, 0x7F
+	mov	ah, 0
+	shl	ax, 1
+	shl	ax, 1
+	shl	ax, 1
+	mov	bp, ax
+
+	mov	ax, 0
+	mov	ds, ax
+	mov	ax, [ds:0x7c]
+	add	bp, ax 
+
+	mov	cx, [ds:0x7e]
+
+	put_cga320_char_vidoffset:
+	mov	ax, 0x40
+	mov	ds, ax
+
+	; Get the address offset in video ram for the top of the character into DI
+	mov	al, 80 ; bytes per row
+	mul	byte [ds:curpos_y-bios_data]
+	shl	ax, 1
+	shl	ax, 1
+	add	al, [ds:curpos_x-bios_data]
+	adc	ah, 0
+	add	al, [ds:curpos_x-bios_data]
+	adc	ah, 0
+	mov	di, ax
+
+	; get segment for character data into ds
+	mov	ds, cx
+
+	; get video RAM address for even lines into es
+	mov	ax, 0xb800
+	mov	es, ax
+
+	push	di
+
+	mov	bl, byte [ds:bp]
+	; Translate character glyph into CGA 320 format
+	call	put_cga320_char_double
+	stosw
+	add	di, 78
+
+	mov	bl, byte [ds:bp+2]
+	; Translate character glyph into CGA 320 format
+	call put_cga320_char_double
+	stosw
+	add	di, 78
+
+	mov	bl, byte [ds:bp+4]
+	; Translate character glyph into CGA 320 format
+	call put_cga320_char_double
+	stosw
+	add	di, 78
+
+	mov	bl, byte [ds:bp+6]
+	; Translate character glyph into CGA 320 format
+	call put_cga320_char_double
+	stosw
+
+	; get video RAM address for odd lines into es
+	mov ax, 0xba00
+	mov es, ax
+
+	pop	di
+
+	mov	bl, byte [ds:bp+1]
+	; Translate character glyph into CGA 320 format
+	call put_cga320_char_double
+	stosw
+	add	di, 78
+
+	mov	bl, byte [ds:bp+3]
+	; Translate character glyph into CGA 320 format
+	call put_cga320_char_double
+	stosw
+	add	di, 78
+
+	mov	bl, byte [ds:bp+5]
+	; Translate character glyph into CGA 320 format
+	call put_cga320_char_double
+	stosw
+	add	di, 78
+
+	mov	bl, byte [ds:bp+7]
+	; Translate character glyph into CGA 320 format
+	call put_cga320_char_double
+	stosw	
+
+	put_cga320_char_done:
+
+	pop	bp
+	pop	di
+	pop	es
+	pop	ds
+	pop	cx
+	pop	bx
+	pop	ax
+	ret
+
+  put_cga320_char_double:
+	; BL = character bit pattern
+	; BH = colour mask
+	; AX is set to double width character bit pattern
+
+	mov	ax, 0
+	test	bl, 0x80
+	je	put_chachar_bit6
+	or	al, 0xc0
+	put_chachar_bit6:
+	test	bl, 0x40
+	je	put_chachar_bit5
+	or	al, 0x30
+	put_chachar_bit5:
+	test	bl, 0x20
+	je	put_chachar_bit4
+	or	al, 0x0c
+	put_chachar_bit4:
+	test	bl, 0x10
+	je	put_chachar_bit3
+	or	al, 0x03
+	put_chachar_bit3:
+	test	bl, 0x08
+	je	put_chachar_bit2
+	or	ah, 0xc0
+	put_chachar_bit2:
+	test	bl, 0x04
+	je	put_chachar_bit1
+	or	ah, 0x30
+	put_chachar_bit1:
+	test	bl, 0x02
+	je	put_chachar_bit0
+	or	ah, 0x0c
+	put_chachar_bit0:
+	test	bl, 0x01
+	je	put_chachar_done
+	or	ah, 0x03
+	put_chachar_done:
+	and	al, bh
+	and	ah, bh
+	ret
 
   int10_get_vm:
 
@@ -2563,29 +2401,6 @@ hex_to_bcd:
 	pop	bx
 	ret
 
-; Takes a number in AL (from 0 to 99), and outputs the value in decimal using extended_putchar_al.
-
-puts_decimal_al:
-
-	push	ax
-	
-	aam
-	add	ax, 0x3030	; '00'
-	
-	cmp	ah, 0x30
-	je	pda_2nd		; First digit is zero, so print only 2nd digit
-
-	xchg	ah, al		; First digit is now in AL
-	extended_putchar_al	; Print first digit
-	xchg	ah, al		; Second digit is now in AL
-
-  pda_2nd:
-
-	extended_putchar_al	; Print second digit
-
-	pop	ax
-	ret
-
 ; Keyboard adjust buffer head and tail. If either head or the tail are at the end of the buffer, reset them
 ; back to the start, since it is a circular buffer.
 
@@ -2708,49 +2523,14 @@ chs_continue:
 	pop	ax
 	ret
 
-; Clear screen using ANSI codes. Also clear video memory with attribute in BH
+; Clear video memory with attribute in BH
 
 clear_screen:
 
 	push	ax
 
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-	mov	al, 'r'		; Set scrolling window
-	extended_putchar_al
-
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-	mov	al, '0'		; Reset attributes
-	extended_putchar_al
-	mov	al, 'm'		; Reset attributes
-	extended_putchar_al
-
-	push	bx
-	push	cx
-	push	bp
 	push	ax
 	push	es
-
-	mov	bp, bx		; Convert from CGA to ANSI
-	mov	cl, 12
-	ror	bp, cl
-	and	bp, 7
-	mov	bl, byte [cs:bp+colour_table]
-	add	bl, 10
-
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-	mov	al, bl		; Background colour
-	call	puts_decimal_al
-	mov	al, 'm'		; Set cursor position command
-	extended_putchar_al
 
 	mov	ax, 0x40
 	mov	es, ax
@@ -2761,35 +2541,10 @@ clear_screen:
 
 	pop	es
 	pop	ax
-	pop	bp
-	pop	cx
-	pop	bx
 
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-	mov	al, '2'		; Clear screen
-	extended_putchar_al
-	mov	al, 'J'
-	extended_putchar_al
-
-	mov	al, 0x1B	; Escape
-	extended_putchar_al
-	mov	al, '['		; ANSI
-	extended_putchar_al
-	mov	al, '1'		; Cursor row 1
-	extended_putchar_al
-	mov	al, ';'
-	extended_putchar_al
-	mov	al, '1'		; Cursor column 1
-	extended_putchar_al
-	mov	al, 'H'		; Set cursor
-	extended_putchar_al
-
-	push	es
-	push	di
-	push	cx
+	push es
+	push di
+	push cx
 
 	cld
 	mov	ax, 0xb800
@@ -2800,27 +2555,11 @@ clear_screen:
 	mov	cx, 80*25
 	rep	stosw
 
-	;cld
-	;mov	di, 0xc800
-	;mov	es, di
-	;mov	di, 0
-	;mov	cx, 80*25
-	;rep	stosw
-
-	;cld
-	;mov	di, 0xb800
-	;mov	es, di
-	;mov	di, 0
-	;mov	cx, 80*25
-	;rep	stosw
-
 	pop	cx
 	pop	di
 	pop	es
 
 	pop	ax
-
-	;mov	byte [cs:vram_dirty], 1
 
 	ret
 
@@ -2862,44 +2601,6 @@ reach_stack_carry:
 
 	jc	reach_stack_stc
 	jmp	reach_stack_clc
-
-; Show cursor using ANSI codes
-
-ansi_show_cursor:
-
-	mov	al, 0x1B
-	extended_putchar_al
-	mov	al, '['
-	extended_putchar_al
-	mov	al, '?'
-	extended_putchar_al
-	mov	al, '2'
-	extended_putchar_al
-	mov	al, '5'
-	extended_putchar_al
-	mov	al, 'h'
-	extended_putchar_al
-
-	ret
-
-; Hide cursor using ANSI codes
-
-ansi_hide_cursor:
-
-	mov	al, 0x1B
-	extended_putchar_al
-	mov	al, '['
-	extended_putchar_al
-	mov	al, '?'
-	extended_putchar_al
-	mov	al, '2'
-	extended_putchar_al
-	mov	al, '5'
-	extended_putchar_al
-	mov	al, 'l'
-	extended_putchar_al
-
-	ret
 
 ; ****************************************************************************************
 ; That's it for the code. Now, the data tables follow.
@@ -3067,10 +2768,6 @@ int_table	dw int0
           	dw int1e
 
 itbl_size	dw $-int_table
-
-; Conversion from CGA video memory colours to ANSI colours
-
-colour_table	db	30, 34, 32, 36, 31, 35, 33, 37
 
 ; CGA font data
 

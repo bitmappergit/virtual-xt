@@ -28,8 +28,8 @@ function create_project(k)
         links { 'libvxt' }
 
         if os.is('windows') then
-            links { 'comdlg32' }
-            links { 'SDL2' }
+            links { 'comdlg32', 'SDL2' }
+            files { 'tools/package/itch/icon.rc' }
         elseif os.is('macosx') then
             links { 'Foundation.framework', 'AppKit.framework', 'SDL2.framework' }
             files { 'src/nfd/nfd_common.c', 'src/nfd/nfd_cocoa.m' }
@@ -46,6 +46,12 @@ end
 function write_version()
     local fp = io.open('src/version.h', 'w')
     fp:write(string.format('#define VERSION_STRING "%s"', version))
+    io.close(fp)
+end
+
+function create_rc()
+    local fp = io.open('tools/package/itch/icon.rc', 'w')
+    fp:write('1 ICON "doc/icon/icon.ico"')
     io.close(fp)
 end
 
@@ -87,7 +93,9 @@ function create_app()
 end
 
 write_version()
-if os.is('macosx') then
+if os.is('windows') then
+    create_rc()
+elseif os.is('macosx') then
     create_app()
 end
 

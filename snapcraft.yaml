@@ -21,7 +21,7 @@ parts:
       - premake4
       - libsdl2-dev
     stage-packages:
-      - libsdl2
+      - libsdl2-2.0
       - zenity
 
 apps:

@@ -12,7 +12,9 @@ parts:
   virtualxt:
     plugin: make
     source: https://github.com/andreas-jonsson/virtual-xt.git
-    prepare: premake4 gmake
+    override-build: |
+      premake4 gmake
+      snapcraftctl build
     build-packages:
       - gcc
       - make

@@ -35,6 +35,7 @@ matrix:
             - snapcraft
 
       before_install:
+        - export SKIP_DEPLOY=1
         - curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default && unzip butler.zip
     
       script:

@@ -17,8 +17,28 @@ matrix:
         - curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default && unzip butler.zip
     
       script:
+        - premake4 gmake
         - make config=release
         - ./tools/package/itch/package.linux.sh
+
+    ################ Linux Snap Build ################
+
+    - name: Linux (snap)
+      os: linux
+      dist: bionic
+
+      addons:
+        apt:
+          packages:
+            - libsdl2-dev
+            - premake4
+            - snapcraft
+
+      before_install:
+        - curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default && unzip butler.zip
+    
+      script:
+        - snapcraft
 
     ################ OSX Build ################
 
@@ -42,6 +62,7 @@ matrix:
         - brew install git-lfs
 
       script:
+        - premake4 gmake
         - make config=release
         - ./tools/package/itch/package.osx.sh
 
@@ -63,6 +84,7 @@ matrix:
         - choco install make
 
       script:
+        - premake4 gmake
         - make config=release
         - ./tools/package/itch/package.bat
 
@@ -84,9 +106,6 @@ notifications:
 install:
   - export PATH=$TRAVIS_BUILD_DIR:$PATH
   - git lfs pull
-
-before_script:
-  - premake4 gmake
 
 deploy:
   provider: script

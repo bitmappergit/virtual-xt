@@ -1,0 +1,30 @@
+name: virtualxt
+version: "0.0.1"
+summary: "Lightweight IBM PC/XT emulator"
+description: |
+  VirtualXT is a IBM PC/XT emulator that runs on modern hardware and operating systems.
+  It is designed to be simple and lightweight yet still capable enough to run a large library of old application and games.
+
+base: core18
+confinement: devmode
+
+parts:
+  virtualxt:
+    plugin: make
+    source: https://github.com/andreas-jonsson/virtual-xt.git
+    prepare: premake4 gmake
+    build-packages:
+      - gcc
+      - make
+      - premake4
+      - libsdl2.0-dev
+    stage-packages:
+      - libsdl2.0
+      - zenity
+
+apps:
+  virtualxt:
+    command: virtualxt
+    #environment:
+      #"LD_LIBRARY_PATH": "$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pulseaudio"
+      #"DISABLE_WAYLAND": "1"

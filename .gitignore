@@ -55,4 +55,7 @@ Makefile
 *.make
 *.vcxproj*
 *.sln
+
+obj/**
 src/version.h
+tools/package/itch/icon.rc

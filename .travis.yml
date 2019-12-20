@@ -114,3 +114,4 @@ deploy:
   script: bash tools/package/itch/push.sh
   on:
     branch: release
+    condition: $SKIP_DEPLOY = ""

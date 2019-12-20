@@ -19,9 +19,9 @@ parts:
       - gcc
       - make
       - premake4
-      - libsdl2.0-dev
+      - libsdl2-dev
     stage-packages:
-      - libsdl2.0
+      - libsdl2
       - zenity
 
 apps:

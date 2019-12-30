@@ -28,7 +28,6 @@ parts:
       - libsdl2-dev
     stage-packages:
       - libsdl2-2.0-0
-      - libpulse0
       - zenity
 
   manual:
@@ -40,6 +39,6 @@ parts:
 apps:
   virtualxt:
     command: virtualxt
-    #environment:
-      #"LD_LIBRARY_PATH": "$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pulseaudio"
+    environment:
+      LD_LIBRARY_PATH: $LD_LIBRARY_PATH:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pulseaudio
       #"DISABLE_WAYLAND": "1"

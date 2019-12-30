@@ -34,7 +34,7 @@ parts:
     source: doc/manual/
     plugin: dump
     organize:
-      "doc/manual/*": user/share/virtualxt/manual/
+      "*": usr/share/virtualxt/manual/
 
 apps:
   virtualxt:

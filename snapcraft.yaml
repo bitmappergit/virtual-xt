@@ -30,6 +30,12 @@ parts:
       - libsdl2-2.0-0
       - zenity
 
+  manual:
+    source: doc/manual/
+    plugin: dump
+    organize:
+      "doc/manual/*": user/share/virtualxt/manual/
+
 apps:
   virtualxt:
     command: virtualxt

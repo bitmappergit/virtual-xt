@@ -44,6 +44,16 @@ parts:
     organize:
       "*": usr/share/virtualxt/manual/
 
+plugs:
+  disk-image:
+    interface: personal-files
+    write:
+    - $HOME
+  disk-image-root:
+    interface: system-files
+    write:
+    - /
+
 apps:
   virtualxt:
     command: virtualxt
@@ -63,4 +73,5 @@ apps:
       - audio-playback
       - pulseaudio
       - joystick
-      - personal-files
+      - disk-image
+      - disk-image-root

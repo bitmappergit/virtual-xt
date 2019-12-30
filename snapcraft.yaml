@@ -48,7 +48,7 @@ plugs:
   disk-image:
     interface: personal-files
     write:
-    - $HOME
+    - $HOME/
   disk-image-root:
     interface: system-files
     write:

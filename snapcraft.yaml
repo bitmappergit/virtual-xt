@@ -28,6 +28,7 @@ parts:
       - libsdl2-dev
     stage-packages:
       - libsdl2-2.0-0
+      - libpulse0
       - zenity
 
   manual:

@@ -19,6 +19,8 @@ parts:
       - config=release
     artifacts:
       - virtualxt
+    organize:
+      virtualxt: bin/virtualxt
     build-packages:
       - gcc
       - make

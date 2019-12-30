@@ -39,6 +39,12 @@ parts:
 apps:
   virtualxt:
     command: virtualxt
+    plugs:
+      - x11
+      - opengl
+      - audio-playback
+      - pulseaudio
+      - joystick
     environment:
       LD_LIBRARY_PATH: $LD_LIBRARY_PATH:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pulseaudio
-      #"DISABLE_WAYLAND": "1"
+      #DISABLE_WAYLAND: true

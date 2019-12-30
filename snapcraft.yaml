@@ -48,8 +48,15 @@ apps:
   virtualxt:
     command: virtualxt
     environment:
-      LD_LIBRARY_PATH: $LD_LIBRARY_PATH:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pulseaudio
-      LIBGL_DRIVERS_PATH: $LIBGL_DRIVERS_PATH:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/dri
+      SHELL: bash
+      LC_ALL: C.UTF-8
+      SNAPCRAFT_ARCH_TRIPLET: $SNAPCRAFT_ARCH_TRIPLET
+      __EGL_VENDOR_LIBRARY_DIRS: $SNAP/etc/glvnd/egl_vendor.d:$SNAP/usr/share/glvnd/egl_vendor.d
+      LIBGL_DRIVERS_PATH: $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/dri
+      LIBVA_DRIVERS_PATH: $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/dri
+      LD_LIBRARY_PATH: LD_LIBRARY_PATH:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pulseaudio
+      HOME: $SNAP_USER_DATA
+      XDG_CACHE_HOME: $SNAP_USER_DATA/.cache
     plugs:
       - x11
       - opengl

@@ -7,6 +7,11 @@ description: |
 
 base: core18
 confinement: devmode
+grade: devel
+license: MIT
+icon: doc/icon/icon.png
+architectures:
+  - build-on: [amd64, arm64]
 
 parts:
   virtualxt:
@@ -28,6 +33,9 @@ parts:
       - libsdl2-dev
     stage-packages:
       - libsdl2-2.0-0
+      - libpulse0
+      - libglu1-mesa
+      - libgl1
       - zenity
 
   manual:
@@ -39,12 +47,12 @@ parts:
 apps:
   virtualxt:
     command: virtualxt
+    environment:
+      LD_LIBRARY_PATH: $LD_LIBRARY_PATH:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pulseaudio
+      #DISABLE_WAYLAND: true
     plugs:
       - x11
       - opengl
       - audio-playback
       - pulseaudio
       - joystick
-    environment:
-      LD_LIBRARY_PATH: $LD_LIBRARY_PATH:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pulseaudio
-      #DISABLE_WAYLAND: true

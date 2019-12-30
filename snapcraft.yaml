@@ -15,6 +15,9 @@ parts:
     override-build: |
       premake4 gmake
       snapcraftctl build
+    make-parameters: config=release
+    artifacts:
+      - virtualxt
     build-packages:
       - gcc
       - make

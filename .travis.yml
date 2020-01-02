@@ -43,9 +43,6 @@ matrix:
         - sudo snap install --classic snapcraft
 
         - sudo chown $USER:$USER /var/snap/multipass/common/multipass_socket
-
-        - multipass list
-
         - snapcraft
 
     ################ OSX Build ################

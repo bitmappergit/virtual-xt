@@ -1,7 +1,9 @@
 #!/bin/bash
 
 if [ $PUSH_SNAP = '1' ]; then
-    echo "Push snap!"
+    mkdir $HOME/.snapcraft
+    echo $SNAPCRAFT_LOGIN_FILE | base64 --decode --ignore-garbage > $HOME/.snapcraft/snapcraft.cfg
+    snapcraft push *.snap --release beta
 else
     cd "${TRAVIS_BUILD_DIR}/package"
     butler validate virtualxt

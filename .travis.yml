@@ -26,6 +26,7 @@ matrix:
     - name: Linux (snap)
       os: linux
       dist: bionic
+      sudo: yes
 
       addons:
         apt:

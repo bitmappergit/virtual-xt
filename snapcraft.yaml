@@ -61,7 +61,7 @@ plugs:
 
 apps:
   virtualxt:
-    command: virtualxt
+    command: bin/virtualxt
     desktop: usr/share/applications/virtualxt.desktop
     extensions: [gnome-3-28]
     environment:

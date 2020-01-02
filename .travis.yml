@@ -39,7 +39,7 @@ matrix:
         - export PUSH_SNAP=1
 
       script:
-        - snap install snapcraft
+        - sudo snap install snapcraft
         - snapcraft clean
         - snapcraft
 

@@ -6,12 +6,13 @@ description: |
   It is designed to be simple and lightweight yet still capable enough to run a large library of old application and games.
 
 base: core18
-confinement: devmode
-grade: devel
-license: MIT
+confinement: strict
+grade: stable
+#license: MIT
 icon: doc/icon/icon.png
 architectures:
-  - build-on: [amd64, arm64]
+  #- build-on: [amd64, arm64]
+  - build-on: [amd64]
 
 parts:
   virtualxt:
@@ -44,6 +45,12 @@ parts:
     organize:
       "*": usr/share/virtualxt/manual/
 
+  icon:
+    source: doc/icon/icon.png
+    plugin: dump
+    organize:
+      "icon.png": usr/share/virtualxt/icon256x256.png
+
 plugs:
   disk-image:
     interface: personal-files
@@ -57,6 +64,7 @@ plugs:
 apps:
   virtualxt:
     command: virtualxt
+    desktop: usr/share/applications/virtualxt.desktop
     environment:
       SHELL: bash
       LC_ALL: C.UTF-8

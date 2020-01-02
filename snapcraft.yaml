@@ -9,7 +9,7 @@ base: core18
 confinement: strict
 grade: stable
 #license: MIT
-icon: doc/icon/icon.png
+icon: tools/package/snap/usr/share/virtualxt/icon512x512.png
 architectures:
   #- build-on: [amd64, arm64]
   - build-on: [amd64]
@@ -45,11 +45,9 @@ parts:
     organize:
       "*": usr/share/virtualxt/manual/
 
-  icon:
-    source: doc/icon/icon.png
+  desktop:
+    source: tools/package/snap/
     plugin: dump
-    organize:
-      "icon.png": usr/share/virtualxt/icon256x256.png
 
 plugs:
   disk-image:

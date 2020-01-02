@@ -32,12 +32,13 @@ matrix:
           packages:
             - libsdl2-dev
             - premake4
-            - snapcraft
+            #- snapcraft
 
       before_install:
         - export PUSH_SNAP=1
 
       script:
+        - snap install snapcraft
         - snapcraft clean
         - snapcraft
 

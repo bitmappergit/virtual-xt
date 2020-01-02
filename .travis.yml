@@ -40,7 +40,7 @@ matrix:
 
       script:
         - sudo snap install --classic snapcraft
-        - snapcraft clean
+        #- snapcraft clean
         - snapcraft enable-ci travis
 
     ################ OSX Build ################

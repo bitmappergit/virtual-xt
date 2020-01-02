@@ -40,6 +40,8 @@ matrix:
 
       script:
         - sudo snap install --classic snapcraft
+        - sudo snap install multipass
+        
         - snapcraft clean
         - snapcraft
 

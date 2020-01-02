@@ -39,7 +39,9 @@ matrix:
         - export PUSH_SNAP=1
 
       script:
-        - sudo snap install --classic multipass snapcraft
+        - sudo snap install --classic multipass
+        - sudo snap install --classic snapcraft
+
         - snapcraft clean
         - snapcraft
 

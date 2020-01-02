@@ -41,8 +41,10 @@ matrix:
       script:
         - sudo snap install --classic multipass
         - sudo snap install --classic snapcraft
-        
+
         - sudo chown $USER:$USER /var/snap/multipass/common/multipass_socket
+
+        - multipass list
 
         - snapcraft
 

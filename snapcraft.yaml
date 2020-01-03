@@ -49,15 +49,15 @@ parts:
     source: tools/package/snap/
     plugin: dump
 
-plugs:
-  disk-image:
-    interface: personal-files
-    write:
-    - $HOME/.
-  disk-image-root:
-    interface: system-files
-    write:
-    - /.
+#plugs:
+#  disk-image:
+#    interface: personal-files
+#    write:
+#    - $HOME/.
+#  disk-image-root:
+#    interface: system-files
+#    write:
+#    - /.
 
 apps:
   virtualxt:

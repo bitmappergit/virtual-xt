@@ -44,6 +44,7 @@ matrix:
 
         - sudo chown $USER:$USER /var/snap/multipass/common/multipass_socket
         - echo $SNAPCRAFT_LOGIN_FILE | base64 --decode --ignore-garbage > snapcraft.login
+        - ls -al snapcraft.login
         - snapcraft login --with snapcraft.login
 
         - snapcraft

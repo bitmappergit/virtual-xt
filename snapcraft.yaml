@@ -80,5 +80,5 @@ apps:
       - audio-playback
       - pulseaudio
       - joystick
-      - disk-image
-      - disk-image-root
+      #- disk-image
+      #- disk-image-root

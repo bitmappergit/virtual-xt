@@ -1,8 +1,6 @@
 #!/bin/bash
 
 if [ $PUSH_SNAP = '1' ]; then
-    echo $SNAPCRAFT_LOGIN_FILE | base64 --decode --ignore-garbage > snapcraft.login
-    snapcraft login --with snapcraft.login
     snapcraft push *.snap --release beta
 else
     cd "${TRAVIS_BUILD_DIR}/package"

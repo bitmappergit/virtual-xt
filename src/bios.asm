@@ -1,6 +1,6 @@
 ; BIOS source for VirtualXT IBM PC/XT emulator.
 ; Copyright (c) 2013-2014 Adrian Cable (adrian.cable@gmail.com)
-; Copyright (c) 2019 Andreas T Jonsson (mail@andreasjonsson.se)
+; Copyright (c) 2019-2020 Andreas T Jonsson (mail@andreasjonsson.se)
 ;
 ; This work is licensed under the MIT License. See included LICENSE file.
 ;

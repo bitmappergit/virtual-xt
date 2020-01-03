@@ -65,7 +65,7 @@ function create_app()
         <key>CFBundleExecutable</key>
         <string>virtualxt</string>
         <key>CFBundleGetInfoString</key>
-        <string>%s, Copyright © 2019 Andreas T Jonsson</string>
+        <string>%s, Copyright © 2019-2020 Andreas T Jonsson</string>
         <key>CFBundleIconFile</key>
         <string>icon.icns</string>
         <key>CFBundleIdentifier</key>
@@ -81,7 +81,7 @@ function create_app()
         <key>CFBundleVersion</key>
         <string>%s</string>
         <key>NSHumanReadableCopyright</key>
-        <string>Copyright © 2019 Andreas T Jonsson, GNU General Public License.</string>
+        <string>Copyright © 2019-2020 Andreas T Jonsson, GNU General Public License.</string>
         <key>LSMinimumSystemVersion</key>
         <string>10.4</string>
     </dict>

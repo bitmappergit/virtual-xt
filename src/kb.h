@@ -1,5 +1,5 @@
 // VirtualXT - Portable IBM PC/XT emulator written in C.
-// Copyright (c) 2019 Andreas T Jonsson (mail@andreasjonsson.se)
+// Copyright (c) 2019-2020 Andreas T Jonsson (mail@andreasjonsson.se)
 //
 // This work is licensed under the MIT License. See included LICENSE file.
 

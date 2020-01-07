@@ -100,15 +100,17 @@ static void replace_floppy()
 		strncpy(buf, path, sizeof(buf));
 		free(path);
 	#else
-		// Check if zenity is installed.
-		if (system("which zenity > /dev/null 2>&1")) {
-			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing dependency", "Please install 'zenity', available at https://wiki.gnome.org/Projects/Zenity", NULL);
-			exit(-1);
-		}
+		#ifndef __EMSCRIPTEN__
+			// Check if zenity is installed.
+			if (system("which zenity > /dev/null 2>&1")) {
+				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing dependency", "Please install 'zenity', available at https://wiki.gnome.org/Projects/Zenity", NULL);
+				exit(-1);
+			}
 
-		FILE *fp = popen("zenity --file-selection --title=\"Select Floppy Image\" --file-filter=*.img", "r");
-		if (fgets(buf, sizeof(buf), fp)) buf[strlen(buf)-1] = 0;
-		pclose(fp);
+			FILE *fp = popen("zenity --file-selection --title=\"Select Floppy Image\" --file-filter=*.img", "r");
+			if (fgets(buf, sizeof(buf), fp)) buf[strlen(buf)-1] = 0;
+			pclose(fp);
+		#endif
 	#endif
 
 	if (*buf) {
@@ -434,6 +436,10 @@ int main(int argc, char *argv[])
 	fd.seek = io_seek;
 
 	vxt_drive_t hd = fd;
+
+	#ifdef __EMSCRIPTEN__
+		fd_arg = "boot.img";
+	#endif
 
 	if (fd_arg)
 	{

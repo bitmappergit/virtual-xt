@@ -1,5 +1,6 @@
 for _,arg in ipairs(_ARGS) do
     if arg == '--wall' then wall = true
+    elseif arg == '--emscripten' then emscripten = true
     else error('Unknown argument: ' .. arg) end
 end
 
@@ -25,7 +26,12 @@ function create_project(k)
     
     if k == 'ConsoleApp' then
         files { 'src/virtualxt.c' }
-        links { 'libvxt' }
+
+        if emscripten then
+            files { 'src/vxt.c' }
+        else
+            links { 'libvxt' }
+        end
 
         if os.is('windows') then
             links { 'comdlg32', 'SDL2' }
@@ -121,8 +127,17 @@ solution 'VirtualXT'
     configuration 'gmake'
         buildoptions { '-fsigned-char -std=gnu99 -Wno-unused-result -Wno-unused-value -fno-strict-aliasing' }
 
+    if emscripten then
+        buildoptions { '-s USE_SDL=2' }
+        linkoptions { '--embed-file tools/floppies/freedos.img@boot.img' }
+    end
+
     project 'virtualxt'
         create_project 'ConsoleApp'
         
-    project 'libvxt'
-        create_project 'StaticLib'
+    if emscripten then
+        targetname 'index.html'
+    else
+        project 'libvxt'
+            create_project 'StaticLib'
+    end

@@ -313,7 +313,7 @@ static vxt_key_t sdl_getkey(void *ud)
 			else continue;
 
 			SDL_Keycode sym = ev.key.keysym.sym;
-			if (ev.key.keysym.mod & KMOD_NUM == 0) switch (sym)
+			if ((ev.key.keysym.mod & KMOD_NUM) == 0) switch (sym)
             {
                 case SDLK_KP_0: key.scancode |= VXT_KEY_KP_INSERT_0; return key;
 				case SDLK_KP_1: key.scancode |= VXT_KEY_KP_END_1; return key;
@@ -490,7 +490,7 @@ int main(int argc, char *argv[])
 
 		SDL_Joystick *sdl_joystick = 0;
 		for (int i = 0; i < SDL_NumJoysticks(); i++) {
-			if (sdl_joystick = SDL_JoystickOpen(i)) {
+			if ((sdl_joystick = SDL_JoystickOpen(i))) {
 				printf("Joystick found: %s\n", SDL_JoystickName(sdl_joystick));
 				break;
 			}

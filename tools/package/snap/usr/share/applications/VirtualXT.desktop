@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=VirtualXT
+Exec=/bin/virtualxt
+Icon=/usr/share/virtualxt/icon512x512.png
+Type=Application
+Terminal=false
+Categories=Utility;

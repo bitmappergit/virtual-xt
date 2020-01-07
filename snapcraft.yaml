@@ -52,7 +52,7 @@ parts:
 apps:
   virtualxt:
     command: bin/virtualxt
-    desktop: usr/share/applications/virtualxt.desktop
+    desktop: usr/share/applications/VirtualXT.desktop
     extensions: [gnome-3-28]
     environment:
       SHELL: bash

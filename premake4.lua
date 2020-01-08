@@ -34,15 +34,15 @@ function create_project(k)
         end
 
         if os.is('windows') then
-            links { 'comdlg32' }
+            links { 'comdlg32', 'SDL2' }
             files { 'tools/package/itch/icon.rc' }
         elseif os.is('macosx') then
-            links { 'Foundation.framework', 'AppKit.framework' }
+            links { 'Foundation.framework', 'AppKit.framework', 'SDL2.framework' }
             files { 'src/nfd/nfd_common.c', 'src/nfd/nfd_cocoa.m' }
             includedirs { 'src/nfd' }
+        else
+            links { 'SDL2' }
         end
-
-        links { 'SDL2' }
     else
         files { 'src/vxt.c' }
         targetname 'vxt'

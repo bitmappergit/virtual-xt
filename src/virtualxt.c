@@ -99,18 +99,16 @@ static void replace_floppy()
 		if (NFD_OpenDialog("*.img", NULL, &path) != NFD_OKAY) return;
 		strncpy(buf, path, sizeof(buf));
 		free(path);
-	#else
-		#ifndef __EMSCRIPTEN__
-			// Check if zenity is installed.
-			if (system("which zenity > /dev/null 2>&1")) {
-				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing dependency", "Please install 'zenity', available at https://wiki.gnome.org/Projects/Zenity", NULL);
-				exit(-1);
-			}
+	#elif !defined(__EMSCRIPTEN__)
+		// Check if zenity is installed.
+		if (system("which zenity > /dev/null 2>&1")) {
+			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing dependency", "Please install 'zenity', available at https://wiki.gnome.org/Projects/Zenity", NULL);
+			exit(-1);
+		}
 
-			FILE *fp = popen("zenity --file-selection --title=\"Select Floppy Image\" --file-filter=*.img", "r");
-			if (fgets(buf, sizeof(buf), fp)) buf[strlen(buf)-1] = 0;
-			pclose(fp);
-		#endif
+		FILE *fp = popen("zenity --file-selection --title=\"Select Floppy Image\" --file-filter=*.img", "r");
+		if (fgets(buf, sizeof(buf), fp)) buf[strlen(buf)-1] = 0;
+		pclose(fp);
 	#endif
 
 	if (*buf) {
@@ -362,6 +360,7 @@ static vxt_key_t sdl_getkey(void *ud)
                 case SDLK_F9: key.scancode |= VXT_KEY_F9; return key;
                 case SDLK_F10: key.scancode |= VXT_KEY_F10; return key;
 
+				case SDLK_F11:
 				case SDLK_F12:
 				{
 					if (ev.type == SDL_KEYDOWN) {

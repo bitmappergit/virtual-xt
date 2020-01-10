@@ -334,6 +334,7 @@ static vxt_key_t sdl_getkey(void *ud)
                 case SDLK_LALT: key.scancode |= VXT_KEY_ALT; return key;
                 case SDLK_NUMLOCKCLEAR: key.scancode |= VXT_KEY_NUMLOCK; return key;
                 case SDLK_SCROLLLOCK: key.scancode |= VXT_KEY_SCROLLOCK; return key;
+				case SDLK_CAPSLOCK: key.scancode |= VXT_KEY_CAPSLOCK; return key;
 				case SDLK_LSHIFT: key.scancode |= VXT_KEY_LSHIFT; return key;
                 case SDLK_RSHIFT: key.scancode |= VXT_KEY_RSHIFT; return key;
                 case SDLK_PRINTSCREEN: key.scancode |= VXT_KEY_PRINT; return key;

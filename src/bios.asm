@@ -379,8 +379,10 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 	je process_ctrl_key
 	cmp	bl, 0x3a 			; CapsLock?
 	je process_capslock_key
-	cmp	bl, 0x12 			; NumLock?
+	cmp	bl, 0x45 			; NumLock?
 	je process_numlock_key
+	cmp	bl, 0x46 			; ScrollLock?
+	je process_scrlock_key
 
 	jmp send_key_press
 
@@ -425,29 +427,58 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 
   process_capslock_key:
 
-    mov al, cl
-	cpu	186
-	shr	al, 1
-	cpu	8086
-	mov ah, al
+	cmp cl, 0
+	jnz send_key_press 		; Toggle on key up.
 
-	mov al, [es:keyflags1-bios_data]
-	and al, 0xBF
+	mov cl, [es:keyflags1-bios_data]
+
+	mov al, cl
+	and al, 0x40
+	xor al, 0x40
+	mov ah, al				; Save toggle state in ah.
+
+	mov al, cl
+	and al, 0xBF 			; Save the other states in al.
+
+	jmp set_key_flag
 
   process_numlock_key:
 
-    mov al, cl
-	cpu	186
-	shr	al, 2
-	cpu	8086
-	mov ah, al
+	cmp cl, 0
+	jnz send_key_press 		; Toggle on key up.
 
-	mov al, [es:keyflags1-bios_data]
-	and al, 0xDF
+	mov cl, [es:keyflags1-bios_data]
+
+	mov al, cl
+	and al, 0x20
+	xor al, 0x20
+	mov ah, al				; Save toggle state in ah.
+
+	mov al, cl
+	and al, 0xDF 			; Save the other states in al.
+
+	jmp set_key_flag
+
+  process_scrlock_key:
+
+	cmp cl, 0
+	jnz send_key_press 		; Toggle on key up.
+
+	mov cl, [es:keyflags1-bios_data]
+
+	mov al, cl
+	and al, 0x10
+	xor al, 0x10
+	mov ah, al				; Save toggle state in ah.
+
+	mov al, cl
+	and al, 0xEF 			; Save the other states in al.
+
+	jmp set_key_flag
 
   set_key_flag:
 
-	or al, ah
+	or al, ah	
 	mov [es:keyflags1-bios_data], al
 
   send_key_press:

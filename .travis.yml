@@ -53,21 +53,12 @@ matrix:
     - name: OSX
       os: osx
 
-      #addons:
-      #  homebrew:
-      #    packages:
-      #      - git-lfs
-
       before_install:
         - curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-macosx.tar.gz/download && tar xvzf premake.tar.gz
         - curl -L -o butler.zip https://broth.itch.ovh/butler/darwin-amd64/LATEST/archive/default && unzip butler.zip
 
         - curl -L -o sdl.dmg https://www.libsdl.org/release/SDL2-2.0.10.dmg && hdiutil attach sdl.dmg
         - sudo cp -r /Volumes/SDL2/SDL2.framework /Library/Frameworks
-
-        # Homebrew addon dosn't seem to work. Run it manually!
-        - brew update
-        - brew install git-lfs
 
       script:
         - premake4 gmake
@@ -113,7 +104,6 @@ notifications:
 
 install:
   - export PATH=$TRAVIS_BUILD_DIR:$PATH
-  - git lfs pull
 
 deploy:
   provider: script

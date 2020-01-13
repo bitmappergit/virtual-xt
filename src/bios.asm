@@ -383,6 +383,8 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 	je process_numlock_key
 	cmp	bl, 0x46 			; ScrollLock?
 	je process_scrlock_key
+	cmp	bl, 0x52 			; Insert?
+	je process_insert_key
 
 	jmp send_key_press
 
@@ -422,6 +424,26 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 
 	mov al, [es:keyflags1-bios_data]
 	and al, 0xFB
+
+	jmp set_key_flag
+
+  process_insert_key:
+
+	mov cl, [es:keyflags1-bios_data]
+
+	test cl, 0x20
+	jne send_key_press 		; Jump if NumLock is on.
+
+	cmp cl, 0
+	jnz send_key_press 		; Toggle on key up.
+
+	mov al, cl
+	and al, 0x80
+	xor al, 0x80
+	mov ah, al				; Save toggle state in ah.
+
+	mov al, cl
+	and al, 0x7F 			; Save the other states in al.
 
 	jmp set_key_flag
 
@@ -515,6 +537,12 @@ int9:
 	je	no_add_buf
 	cmp	al, 0x1d ; Ctrl?
 	je	no_add_buf
+	cmp	bl, 0x3a ; CapsLock?
+	je no_add_buf
+	cmp	bl, 0x45 ; NumLock?
+	je no_add_buf
+	cmp	bl, 0x46 ; ScrollLock?
+	je no_add_buf
 
 	mov	bx, 0x40
 	mov	es, bx

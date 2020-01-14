@@ -45,8 +45,8 @@ main:
 	dw cga_font 	; CGA font lookup for emulator.
 
 ; These values (BIOS ID string, BIOS date and so forth) go at the very top of memory
-biosstr	db	'VirtualXT BIOS Revision 1.0', 0, 0, 0
-mem_top	db	0xea, 0, 0x01, 0, 0xf0, '03/08/14', 0, 0xfe, 0
+biosstr	db	'VirtualXT BIOS Revision 1', 0, 0, 0, 0, 0
+mem_top	db	0xea, 0, 0x01, 0, 0xf0, '14/01/20', 0, 0xfe, 0
 
 bios_entry:
 

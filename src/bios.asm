@@ -1208,12 +1208,11 @@ int10:
 	push	ax
 	push	bp
 	push	bx
-
+	
 	push	ax
-	push	cx
 
-	mov	cl, al
-	mov	ch, bl
+	mov	dl, al
+	mov	dh, bl
 
 	mov	bx, 0x40
 	mov	es, bx
@@ -1231,27 +1230,15 @@ int10:
 	shl	bx, 1
 	add	bx, ax
 
-	mov	bl, ch
+	int10_write_next_char_attrib:
 
-	mov	bh, bl
-	and	bl, 7		; Foreground colour now in bl
+	mov	[bx], dx
+	add bx, 2
 
-	and	bh, 8		; Bright attribute now in bh
-cpu	186
-	shr	bh, 3
-cpu	8086
-	mov	bl, ch
-	mov	bh, bl
-cpu	186
-	shr	bl, 4
-cpu	8086
-	and	bl, 7		; Background colour now in bl
+	dec	cx
+	cmp	cx, 0
 
-	add	bl, 10
-	; rol	bh, 1
-	; and	bh, 1		; Bright attribute now in bh (not used right now)
-	
-	pop	cx
+	jne	int10_write_next_char_attrib
 
     int10_write_char_skip_lines:
 
@@ -1314,38 +1301,6 @@ cpu	8086
 	call	int10_scrollup
 
     int10_write_char_attrib_done:
-
-	pop	bx
-	pop	bp
-	pop	ax
-
-	push ax
-	push bp
-	push bx
-
-	cmp	al, 0x20
-	jl	int10_write_char_attrib_skip
-
-	cmp byte [vidmode-bios_data], 4
-	je 	int10_write_char_attrib_cga320
-	cmp byte [vidmode-bios_data], 5
-	je 	int10_write_char_attrib_cga320
-
-	mov	bx, 0xb800
-	mov	ds, bx
-
-	mov	cl, al
-	mov	ch, bl
-
-	mov	[bx], cx
-
-	jmp int10_write_char_attrib_skip
-
-	int10_write_char_attrib_cga320:
-
-	call put_cga320_char
-
-	int10_write_char_attrib_skip:
 
 	pop	bx
 	pop	bp

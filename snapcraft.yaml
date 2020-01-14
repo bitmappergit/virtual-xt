@@ -1,5 +1,5 @@
 name: virtualxt
-version: "0.0.1"
+version: "0.1.0"
 summary: "Lightweight IBM PC/XT emulator"
 description: |
   VirtualXT is a IBM PC/XT emulator that runs on modern hardware and operating systems.

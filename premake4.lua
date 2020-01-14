@@ -6,7 +6,7 @@ end
 
 version = os.getenv('VXT_VERSION')
 if not version then
-    version = '0.0.1'
+    version = '0.1.0'
 end
 
 sdl2_path = os.getenv('SDL2')

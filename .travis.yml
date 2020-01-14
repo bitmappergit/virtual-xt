@@ -95,7 +95,7 @@ compiler:
   - gcc
 
 env:
-  - VXT_VERSION=0.0.1
+  - VXT_VERSION=0.1.0
 
 notifications:
   email:

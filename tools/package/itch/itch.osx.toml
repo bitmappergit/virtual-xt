@@ -1,7 +1,7 @@
 [[actions]]
 name = "Boot FreeDOS"
 path = "VirtualXT.app"
-args = ["-a", "freedos.img"]
+args = ["-a", "../freedos.img"]
 
 [[actions]]
 name = "Boot Floppy Image"
@@ -9,4 +9,4 @@ path = "VirtualXT.app"
 
 [[actions]]
 name = "manual"
-path = "VirtualXT.app/Contents/MacOS/manual/index.html"
+path = "VirtualXT.app/Contents/Resources/manual/index.html"

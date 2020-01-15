@@ -32,6 +32,9 @@
 	#endif
 #elif defined(__APPLE__) && defined(__MACH__)
 	#include <nfd.h>
+
+	// TODO: Clean this up. See OSX dialogs.
+	static void open_window(void *ud, vxt_mode_t m, int x, int y);
 #else
 	#include <unistd.h>
 #endif
@@ -95,8 +98,12 @@ static void replace_floppy()
 
 		if (!GetOpenFileName(&ofn)) return;
 	#elif defined(__APPLE__) && defined(__MACH__)
-		nfdchar_t *path = NULL;
-		if (NFD_OpenDialog("*.img", NULL, &path) != NFD_OKAY) return;
+
+		// TODO: This is a hack since dialogs won't work without a window.
+		if (!sdl_window) open_window(0, VXT_TEXT, 640, 200);
+
+		nfdchar_t *path = 0;
+		if (NFD_OpenDialog("img", 0, &path) != NFD_OKAY) return;
 		strncpy(buf, path, sizeof(buf));
 		free(path);
 	#elif !defined(__EMSCRIPTEN__)

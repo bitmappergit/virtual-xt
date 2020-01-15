@@ -444,6 +444,8 @@ int main(int argc, char *argv[])
 
 	vxt_drive_t hd = fd;
 
+	fclose(fopen("test_location.txt", "w"));
+
 	#ifdef __EMSCRIPTEN__
 		fd_arg = "boot.img";
 	#endif

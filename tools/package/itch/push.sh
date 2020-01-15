@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [ $PUSH_SNAP = '1' ]; then
-    if [ $TRAVIS_BRANCH = 'release' ]; then
+if [ "$PUSH_SNAP" = '1' ]; then
+    if [ "$TRAVIS_BRANCH" = 'release' ]; then
         snapcraft push *.snap --release beta
     else
         snapcraft push *.snap --release edge

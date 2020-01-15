@@ -407,8 +407,6 @@ static void print_help()
 
 int main(int argc, char *argv[])
 {
-	fclose(fopen("test_location.txt", "w"));
-
 	#if defined(_WIN32) && defined(NDEBUG)
 		ShowWindow(GetConsoleWindow(), SW_HIDE);
 	#endif

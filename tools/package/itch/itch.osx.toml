@@ -1,7 +1,7 @@
 [[actions]]
 name = "Boot FreeDOS"
 path = "VirtualXT.app"
-args = ["-a", "freedos.img"]
+args = ["-a", "VirtualXT.app/Contents/Resources/freedos.img"]
 
 [[actions]]
 name = "Boot Floppy Image"

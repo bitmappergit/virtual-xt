@@ -110,4 +110,5 @@ deploy:
   skip_cleanup: true
   script: bash tools/package/itch/push.sh
   on:
-    branch: release
+    all_branches: true
+    condition: $TRAVIS_BRANCH =~ ^(master|release)$

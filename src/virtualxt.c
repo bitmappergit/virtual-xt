@@ -19,7 +19,6 @@
 #if defined(_WIN32) && !defined(__MINGW32__)
 	#include <SDL.h>
 #else
-	#include <SDL.h>
 	#include <SDL2/SDL.h>
 #endif
 

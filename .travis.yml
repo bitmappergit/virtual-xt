@@ -52,7 +52,7 @@ matrix:
 
     - name: OSX
       os: osx
-      osx_image: xcode11.3
+      osx_image: xcode10.1
 
       before_install:
         - curl -L -o premake.tar.gz http://sourceforge.net/projects/premake/files/Premake/4.4/premake-4.4-beta5-macosx.tar.gz/download && tar xvzf premake.tar.gz
@@ -60,8 +60,6 @@ matrix:
 
         - curl -L -o sdl.dmg https://www.libsdl.org/release/SDL2-2.0.10.dmg && hdiutil attach sdl.dmg
         - sudo cp -r /Volumes/SDL2/SDL2.framework /Library/Frameworks
-
-        - ls /Library/Frameworks/SDL2.framework
 
       script:
         - premake4 gmake

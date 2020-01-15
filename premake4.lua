@@ -37,7 +37,7 @@ function create_project(k)
             links { 'comdlg32', 'SDL2' }
             files { 'tools/package/itch/icon.rc' }
         elseif os.is('macosx') then
-            links { 'Foundation.framework', 'AppKit.framework', 'SDL2' }
+            links { 'Foundation.framework', 'AppKit.framework', 'SDL2.framework' }
             files { 'src/nfd/nfd_common.c', 'src/nfd/nfd_cocoa.m' }
             includedirs { 'src/nfd' }
         else

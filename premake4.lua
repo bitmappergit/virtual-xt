@@ -69,7 +69,7 @@ function create_app()
         <key>CFBundleDevelopmentRegion</key>
         <string>English</string>
         <key>CFBundleExecutable</key>
-        <string>start.sh</string>
+        <string>virtualxt</string>
         <key>CFBundleGetInfoString</key>
         <string>%s, Copyright © 2019-2020 Andreas T Jonsson</string>
         <key>CFBundleIconFile</key>

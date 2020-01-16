@@ -2,7 +2,6 @@
 
 if [ "$(uname)" == "Darwin" ]; then
     HERE="$(cd "$(dirname "$0")" && pwd -P)"
-    cd "${HERE}/../../.."
     open -a VirtualXT.app --args -a "${HERE}/freedos.img"
 else
     HERE="$(dirname "$(readlink -f "${0}")")"

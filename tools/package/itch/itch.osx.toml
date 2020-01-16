@@ -2,7 +2,7 @@
 name = "Boot FreeDOS"
 
 #TODO: Fix this! Passing arguments to app bundle seems to be a problem.
-path = "freedos.sh"
+path = "VirtualXT.app/Contents/Resources/freedos.sh"
 
 #path = "VirtualXT.app"
 #args = ["-a", "VirtualXT.app/Contents/Resources/freedos.img"]

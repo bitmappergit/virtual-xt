@@ -5,6 +5,7 @@ rm -rf $PACKAGE_DEST
 mkdir -p $PACKAGE_DEST/VirtualXT.app/Contents/MacOS $PACKAGE_DEST/VirtualXT.app/Contents/Resources $PACKAGE_DEST/VirtualXT.app/Contents/Frameworks
 
 cp virtualxt $PACKAGE_DEST/VirtualXT.app/Contents/MacOS
+cp tools/package/itch/virtualxt $PACKAGE_DEST/VirtualXT.app/Contents/MacOS/start.sh
 cp tools/package/itch/Info.plist $PACKAGE_DEST/VirtualXT.app/Contents
 cp doc/icon/icon.icns $PACKAGE_DEST/VirtualXT.app/Contents/Resources
 cp -r doc/manual $PACKAGE_DEST/VirtualXT.app/Contents/Resources

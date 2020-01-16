@@ -5,8 +5,8 @@ name = "Boot FreeDOS"
 
 #path = "VirtualXT.app"
 #args = ["-a", "VirtualXT.app/Contents/Resources/freedos.img"]
-path = "VirtualXT.app/Contents/MacOS/virtualxt"
-args = ["-a", "VirtualXT.app/Contents/Resources/freedos.img"]
+path = "VirtualXT.app/Contents/MacOS/start.sh"
+args = ["-a", "../Resources/freedos.img"]
 
 [[actions]]
 name = "Boot Floppy Image"

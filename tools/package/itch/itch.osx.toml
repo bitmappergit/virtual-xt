@@ -1,6 +1,11 @@
 [[actions]]
 name = "Boot FreeDOS"
-path = "VirtualXT.app"
+
+#TODO: Fix this! Passing arguments to app bundle seems to be a problem.
+
+#path = "VirtualXT.app"
+#args = ["-a", "VirtualXT.app/Contents/Resources/freedos.img"]
+path = "VirtualXT.app/Contents/MacOS/virtualxt"
 args = ["-a", "VirtualXT.app/Contents/Resources/freedos.img"]
 
 [[actions]]

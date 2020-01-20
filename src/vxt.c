@@ -83,7 +83,7 @@ struct vxt_emulator {
 	byte i_rm, i_w, i_reg, i_mod, i_mod_size, i_d, i_reg4bit, raw_opcode_id, xlat_opcode_id, extra, rep_mode, seg_override_en, rep_override_en, trap_flag, int8_asap, scratch_uchar, io_hi_lo, spkr_en;
 	word vid_addr_lookup[VIDEO_RAM_SIZE], *regs16, reg_ip, seg_override, file_index, wave_counter;
 	unsigned int pixel_colors[16], op_source, op_dest, rm_addr, op_to_addr, op_from_addr, i_data0, i_data1, i_data2, scratch_uint, scratch2_uint, set_flags_type, GRAPHICS_X, GRAPHICS_Y, vmem_ctr;
-	int op_result, scratch_int, blink;
+	int op_result, scratch_int, blink, screen_off;
 	void *mem_block;
 	vxt_drive_t *scratch_disk;
 	clock_t kb_timer, video_timer;
@@ -295,6 +295,8 @@ static void emuctl_service(vxt_emulator_t *e, byte service)
 			else // Get number of sticks
 				e->regs8[REG_AL] = e->joystick ? 1 : 0;
 		}
+		case 2: // Turn on screen.
+			e->screen_off = 0;
 	}
 }
 
@@ -351,6 +353,7 @@ void vxt_set_audio_control(vxt_emulator_t *e, vxt_pause_audio_t ac, byte silence
 void vxt_set_port_map(vxt_emulator_t *e, vxt_port_map_t *map) { e->port_map = map; }
 void vxt_set_serial(vxt_emulator_t *e, int port, vxt_serial_t *com) { e->serial[port-1] = com; }
 void vxt_set_joystick(vxt_emulator_t *e, vxt_joystick_t *stick) { e->joystick = stick; }
+void vxt_set_screen(vxt_emulator_t *e, int enable) { e->screen_off = enable == 0; }
 void vxt_close(vxt_emulator_t *e) { if (e->mem_block) free(e->mem_block); }
 int vxt_blink(vxt_emulator_t *e) { return e->blink; }
 size_t vxt_memory_required() { return sizeof(vxt_emulator_t); }
@@ -795,7 +798,7 @@ int vxt_step(vxt_emulator_t *e)
 	}
 
 	// Update the video graphics display at 60Hz
-	if (t - e->video_timer >= CLOCKS_PER_SEC / 60)
+	if (!e->screen_off && t - e->video_timer >= CLOCKS_PER_SEC / 60)
 	{
 		e->video_timer = t;
 		e->blink = (t / (CLOCKS_PER_SEC / 3)) % 2;

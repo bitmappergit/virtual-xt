@@ -405,29 +405,32 @@ static void print_help()
 	printf("See manual for option. (-m)\n");
 }
 
+#define PARAM(p) (!strcmp(*argv, (p)))
+
 int main(int argc, char *argv[])
 {
 	#if defined(_WIN32) && defined(NDEBUG)
 		ShowWindow(GetConsoleWindow(), SW_HIDE);
 	#endif
 
-	int hdboot_arg = 0, noaudio_arg = 0, joystick_arg = 0;
+	int hdboot_arg = 0, noaudio_arg = 0, joystick_arg = 0, scroff_arg = 0;
 	double mips_arg = 0.0;
 	const char *fd_arg = 0, *hd_arg = 0, *bios_arg = 0;
 
 	while (--argc && ++argv) {
-		if (!strcmp(*argv, "-h")) { print_help(); return 0; }
-		if (!strcmp(*argv, "-m")) { open_manual(); return 0; }
-		if (!strcmp(*argv, "-v")) { printf(VERSION_STRING "\n"); return 0; }
-		if (!strcmp(*argv, "-a")) { fd_arg = argc-- ? *(++argv) : fd_arg; continue; }
-		if (!strcmp(*argv, "-c")) { hd_arg = argc-- ? *(++argv) : hd_arg; continue; }
-		if (!strcmp(*argv, "--mips")) { mips_arg = argc-- ? atof(*(++argv)) : mips_arg; continue; }
-		if (!strcmp(*argv, "--hdboot")) { hdboot_arg = 1; continue; }
-		if (!strcmp(*argv, "--noaudio")) { noaudio_arg = 1; continue; }
-		if (!strcmp(*argv, "--joystick")) { joystick_arg = 1; continue; }
-		if (!strcmp(*argv, "--bios")) { bios_arg = argc-- ? *(++argv) : bios_arg; continue; }
-		if (!strcmp(*argv, "--filter")) { scale_filter = argc-- ? *(++argv) : scale_filter; continue; }
-		if (!strcmp(*argv, "--driver")) { video_driver = argc-- ? *(++argv) : video_driver; continue; }
+		if (PARAM("-h")) { print_help(); return 0; }
+		if (PARAM("-m")) { open_manual(); return 0; }
+		if (PARAM("-v")) { printf(VERSION_STRING "\n"); return 0; }
+		if (PARAM("-a")) { fd_arg = argc-- ? *(++argv) : fd_arg; continue; }
+		if (PARAM("-c")) { hd_arg = argc-- ? *(++argv) : hd_arg; continue; }
+		if (PARAM("--mips")) { mips_arg = argc-- ? atof(*(++argv)) : mips_arg; continue; }
+		if (PARAM("--scroff")) { scroff_arg = 1; continue; }
+		if (PARAM("--hdboot")) { hdboot_arg = 1; continue; }
+		if (PARAM("--noaudio")) { noaudio_arg = 1; continue; }
+		if (PARAM("--joystick")) { joystick_arg = 1; continue; }
+		if (PARAM("--bios")) { bios_arg = argc-- ? *(++argv) : bios_arg; continue; }
+		if (PARAM("--filter")) { scale_filter = argc-- ? *(++argv) : scale_filter; continue; }
+		if (PARAM("--driver")) { video_driver = argc-- ? *(++argv) : video_driver; continue; }
 		printf("Invalid parameter: %s\n", *argv); return -1;
 	}
 
@@ -510,6 +513,8 @@ int main(int argc, char *argv[])
 			SDL_JoystickEventState(SDL_ENABLE);
 		}
 	}
+
+	vxt_set_screen(e, scroff_arg ? 0 : 1);
 
 	if (!fd_arg && !hd_arg)
 		replace_floppy();

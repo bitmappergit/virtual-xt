@@ -39,6 +39,8 @@
     Set the speed of the emulator in MIPS. (Runns at max speed by default.)<br/>
     <h3>--hdboot</h3>
     Boot from harddrive if specified.<br/>
+    <h3>--scroff</h3>
+    Start emulator with screen disabled.<br/>
     <h3>--noaudio</h3>
     Disable all sound. (Enabled by default.)<br/>
     <h3>--joystick</h3>
@@ -94,6 +96,21 @@
     </ul>
 
     If you want to modify the disk image from your host system you can use <a href="https://www.osforensics.com/tools/mount-disk-images.html">OSFMount</a>.
+</div>
+
+<br/>
+
+<div id="bundle">
+    <h2>░▒▓█ Create a Bundle █▓▒░</h2>
+    You can create a game or application bundle that gives a look and feal like the application</br>
+    is running on your native system. It is a great way to distribute old games!
+    <ul>
+        <li>Create a bootable <a href="#hd_image">disk image</a> with your application.</li>
+        <li>Copy EMUCTL.EXE to your image.</li>
+        <li>Add the following at the end of your AUTOEXEC.BAT:</li>
+        <mark>cls</br>emuctl /s</br>your_app_name.exe</br>emuctl /q</mark>
+        <li>Create a "startup script" and pass the following arguments to VirtualXT, <mark>--scroff -c path/to/disk.img</mark>.</li>
+    </ul>
 </div>
 
 <br/>

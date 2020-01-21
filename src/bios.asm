@@ -340,7 +340,7 @@ next_out:
 
 ; ************************* INT 7h handler - keyboard driver (VirtualXT internal)
 
-int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
+int1d:	; Whenever the user presses a key, INT 7 is called by the emulator.
 	; Scancode is at 0040:this_keystroke and ASCII at 0040:this_keystroke_ascii
 
 	push	ds
@@ -2361,6 +2361,7 @@ int3:
 int4:
 int5:
 int6:
+int7:
 intb:
 intc:
 intd:
@@ -2368,7 +2369,6 @@ inte:
 intf:
 int18:
 int1b:
-int1d:
 
 iret
 

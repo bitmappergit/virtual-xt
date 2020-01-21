@@ -857,7 +857,7 @@ int vxt_step(vxt_emulator_t *e)
 		if (key.scancode) {
 			e->mem[0x4A6] = key.scancode;
 			e->mem[0x4A6+1] = key.ascii;
-			pc_interrupt(e, 7);
+			pc_interrupt(e, 0x1d);
 		}
 	}
 
